@@ -2,6 +2,7 @@
   "name": "invoice-generator",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://Gabbs27.github.io",
   "dependencies": {
     "@react-pdf/renderer": "^3.0.1",
     "@testing-library/jest-dom": "^5.16.5",
@@ -23,11 +24,11 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "predeploy" : "npm run build",
-    "deploy" : "gh-pages -d build",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "predeploy": "npm run build",
+"deploy": "gh-pages -d build"
   },
   "eslintConfig": {
     "extends": [
@@ -50,6 +51,7 @@
   "devDependencies": {
     "@types/react-datepicker": "^4.8.0",
     "@types/uuid": "^9.0.0",
+    "gh-pages": "^4.0.0",
     "sass": "^1.56.2"
   }
 }
