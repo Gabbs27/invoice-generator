@@ -11,7 +11,7 @@ export const initialInvoice: Invoice = {
   logoWidth: 100,
   title: 'No. Factura',
   companyName: 'Ladiv Estudio Creativo SRL',
-  companyRNC: '132612671n',
+  companyRNC: '132612671',
   name: 'Leslie Medina',
   companyAddress: 'Calle Gaspar Polanco #280, Bella Vista',
   companyAddress2: 'Santo Domingo, DN',
