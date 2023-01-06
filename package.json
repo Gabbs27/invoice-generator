@@ -2,7 +2,7 @@
   "name": "invoice-generator",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://Gabbs27.github.io",
+  "homepage": "./",
   "dependencies": {
     "@react-pdf/renderer": "^3.0.1",
     "@testing-library/jest-dom": "^5.16.5",
