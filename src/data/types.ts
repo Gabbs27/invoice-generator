@@ -11,12 +11,14 @@ export interface Invoice {
   logoWidth: number
   title: string
   companyName: string
+  companyRNC: string
   name: string
   companyAddress: string
   companyAddress2: string
   companyCountry: string
 
   billTo: string
+  clientRNC: string
   clientName: string
   clientAddress: string
   clientAddress2: string

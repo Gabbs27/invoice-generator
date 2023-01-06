@@ -159,6 +159,13 @@ const InvoicePage: FC<Props> = ({ data, pdfMode, onChange }) => {
               onChange={(value) => handleChange('companyName', value)}
               pdfMode={pdfMode}
             />
+             <EditableInput
+              className="fs-20 bold"
+              placeholder="RNC de la Compañia"
+              value={invoice.companyRNC}
+              onChange={(value) => handleChange('companyRNC', value)}
+              pdfMode={pdfMode}
+            />
             <EditableInput
               placeholder="Tu nombre"
               value={invoice.name}
@@ -201,6 +208,13 @@ const InvoicePage: FC<Props> = ({ data, pdfMode, onChange }) => {
               className="bold dark mb-5"
               value={invoice.billTo}
               onChange={(value) => handleChange('billTo', value)}
+              pdfMode={pdfMode}
+            />
+             <EditableInput
+             className='bold dark mb-5'
+              placeholder="RNC del Cliente"
+              value={invoice.clientRNC}
+              onChange={(value) => handleChange('clientRNC', value)}
               pdfMode={pdfMode}
             />
             <EditableInput
