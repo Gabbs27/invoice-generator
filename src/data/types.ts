@@ -4,6 +4,7 @@ export interface ProductLine {
   description: string
   quantity: string
   rate: string
+  discount: string
 }
 
 export interface Invoice {
@@ -35,11 +36,12 @@ export interface Invoice {
   productLineQuantity: string
   productLineQuantityRate: string
   productLineQuantityAmount: string
-
+  productLineDiscount: string
   productLines: ProductLine[]
 
   subTotalLabel: string
   taxLabel: string
+  discLabel: string
 
   totalLabel: string
   currency: string
