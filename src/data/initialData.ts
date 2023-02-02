@@ -4,6 +4,8 @@ export const initialProductLine: ProductLine = {
   description: '',
   quantity: '1',
   rate: '0.00',
+  discount: '0%'
+  
 }
 
 export const initialInvoice: Invoice = {
@@ -32,17 +34,21 @@ export const initialInvoice: Invoice = {
   productLineQuantity: 'Cant',
   productLineQuantityRate: 'Unidad',
   productLineQuantityAmount: 'Total',
+  productLineDiscount: 'Discount',
   productLines: [
     {
       description: 'Brochure Design',
       quantity: '2',
       rate: '100.00',
+      discount:'0%'
+      
     },
     { ...initialProductLine },
     { ...initialProductLine },
   ],
   subTotalLabel: 'Sub Total',
-  taxLabel: 'ITBs (18%)',
+  taxLabel: 'ITBIS (18%)',
+  discLabel: 'Discount (0%)',
   totalLabel: 'TOTAL',
   currency: '$',
   notesLabel: 'Notes',
