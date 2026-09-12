@@ -273,28 +273,29 @@ git commit -am "feat(ecf): e-NCF construction, parsing and validation"
 
 ---
 
-### Task 4: RNC and cédula check digits
+### Task 4: RNC and cédula format
 
-**STOP AND VERIFY BEFORE WRITING THE ALGORITHM.**
+**Decided on 2026-09-12: format only, no check digit.** None of the DGII
+documents in `esquemas/docs/` defines a check-digit algorithm for the RNC or the
+cédula. What DGII does publish is the XSD's `RNCValidationType`,
+`[0-9]{11}|[0-9]{9}`, and that is what gets validated: nine digits is an RNC,
+eleven is a cédula.
 
-The weighted-sum algorithm for the RNC check digit is widely published but is not
-in a DGII document I have verified. Before implementing:
-
-1. Collect at least five real RNCs from invoices Gabriel already has, plus five
-   cédulas, and write them into the test as known-valid fixtures.
-2. Implement the algorithm.
-3. If any known-valid number fails, the algorithm is wrong — not the number.
-   Ask before adjusting.
+The weighted-sum algorithm that circulates online is not a DGII publication. It
+can come back as a warning that never blocks issuing, once there is a DGII
+source or a set of real RNCs to check it against. Real people's cédulas do not
+go into the fixtures of a public repo.
 
 **Files:**
 - Create: `lib/ecf/identificacion.ts`
 - Test: `lib/ecf/identificacion.test.ts`
 
-The test must contain both directions: known-valid numbers that pass, and the
-same numbers with one digit changed, which must fail. A validator that accepts
-everything passes a test that only ever feeds it valid input.
+The test covers both directions: nine and eleven digits pass; every other length,
+dashes, surrounding whitespace and letters fail. A validator that accepts
+everything fails the second half, and one that rejects everything fails the
+first.
 
-**Commit:** `feat(ecf): RNC and cédula validation`
+**Commit:** `feat(ecf): RNC and cédula format`
 
 ---
 
