@@ -81,6 +81,38 @@ export default async function Pagina() {
         </section>
       )}
 
+      <section className={estilos.advertencia} aria-labelledby="titulo-advertencia">
+        <h2 id="titulo-advertencia" className={estilos.advertenciaTitulo}>
+          Esta herramienta no transmite a DGII
+        </h2>
+        <p>
+          Arma, firma y valida los e-CF, pero no los envía. Mientras DGII no reciba un e-CF, su
+          representación impresa no sirve para sustentar crédito fiscal, y usar esta herramienta
+          no te hace emisor electrónico.
+        </p>
+        <details className={estilos.requisitos}>
+          <summary>Lo que sí hace falta para emitir e-CF</summary>
+          <ul>
+            <li>Estar inscrito en el RNC y tener clave de acceso a la Oficina Virtual (OFV).</li>
+            <li>Completar el formulario FI-GDF-016 de solicitud para ser emisor electrónico.</li>
+            <li>
+              Un Certificado Digital para Procesos Tributarios, de una prestadora autorizada por
+              el INDOTEL, a nombre de quien representa al contribuyente.
+            </li>
+            <li>
+              Aprobar la certificación de DGII: los sets de pruebas de datos, simulación y
+              comunicación, y la declaración jurada.
+            </li>
+            <li>Ya certificado, solicitar los e-NCF en la OFV.</li>
+          </ul>
+          <p>DGII también ofrece un Facturador Gratuito a quien emite hasta 150 facturas al mes.</p>
+          <p className={estilos.fuente}>
+            Fuentes: Guía para ser Emisor Electrónico (DGII, enero de 2025) e Informe Técnico e-CF
+            v1.0, sección 18.
+          </p>
+        </details>
+      </section>
+
       <Emision modo={modo} habilitado={!(emisor instanceof Error)} />
     </main>
   );
