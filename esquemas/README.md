@@ -65,6 +65,7 @@ También detecta un XSD editado a mano en el repo.
 ## `docs/`
 
 Especificaciones en PDF, bajadas del mismo portal: formato e-CF, ARECF, ACECF,
-RFCE, el Informe Técnico, el proceso de certificación del emisor y las dos guías
-básicas. La *Descripción Técnica v1.6* que todavía aparece en buscadores ya no
+RFCE, el Informe Técnico, el proceso de certificación del emisor, las dos guías
+básicas y *Firmado de e-CF* (sección «Instructivos sobre Facturación
+Electrónica»), que es donde DGII define la firma. La *Descripción Técnica v1.6* que todavía aparece en buscadores ya no
 existe: su URL da 404.
