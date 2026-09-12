@@ -456,28 +456,35 @@ misspells three of them (`RECxml-c14n`, `xmldsigmore`, `envelope d-signature`).
 The TypeScript sample (pp.5–12) also puts `SignatureValue` after `KeyInfo`;
 XMLDSig, and the example on p.3, put it right after `SignedInfo`.
 
-**This task starts with a spike, not with code.** The library APIs here are not
-something to assume.
+**What the spike found** (2026-09-12, in a scratch directory outside the repo):
 
-**Step 1: Spike**, in a scratch directory outside the repo:
+- `node-forge` opens `.p12` files with OpenSSL 3's default encryption (PBES2,
+  AES-256-CBC) and with `-legacy` (RC2-40), and rejects a wrong password.
+- `xml-crypto` 6.1.2 cannot sign this structure. With `enveloped-signature` as
+  the only transform, it digests xmldom's serialization of the document when
+  signing, but appends C14N when verifying, as XMLDSig requires
+  (`lib/signed-xml.js`, lines 315 and 574–575). The two agree until the document
+  has an empty element: type 32 always carries `<Comprador></Comprador>`, which
+  serializes as `<Comprador/>`, and its signature failed the library's own
+  verification and an independent one. An explicit C14N transform fixes it but
+  adds a second `<Transform>` that DGII's structure does not have.
+- Decided with Gabriel: `firma.ts` builds `SignedInfo` and `Signature` itself,
+  canonicalizes with `xml-crypto`'s `C14nCanonicalization` and signs with Node's
+  `crypto`. The document stays byte-for-byte what `construirXML` produced, plus
+  the signature. Signed that way, types 31 and 32 verify with `xml-crypto` and,
+  independently, with libxml2's canonicalization and Node's `crypto`, and they
+  validate against the XSD. Not reported upstream yet.
 
-1. Generate self-signed `.p12` files with `openssl`, one with OpenSSL 3's
-   default encryption and one with `-legacy`: certificates from real CAs come
-   either way.
-2. Read them with `node-forge` and extract the private key and certificate.
-3. Sign an e-CF built by `construirXML` with a maintained XMLDSig library
-   (`xml-crypto` first, `xmldsigjs` if it falls short), producing exactly the
-   structure above.
-4. Verify the signature back with the library, and independently: recompute
-   the digest and check the RSA signature with a second canonicalizer
-   (libxml2's, through `xmllint-wasm`) and Node's `crypto`.
-5. Validate the signed XML against the XSD, as Task 7 does.
+**Files:**
+- Create: `lib/ecf/firma.ts` — takes the `.p12` bytes and its password, or a key
+  and certificate; never reads from disk.
+- Test: `lib/ecf/firma.test.ts` — generates its own keys, so the repo holds no
+  signing material. It pins the exact structure, verifies with `xml-crypto` and
+  with libxml2, validates against the XSD, and alters an amount after signing to
+  prove the signature notices.
 
-If any step does not work, report it before going further. Do not proceed on a
-signature that has never been verified.
-
-**Step 2 onward:** wrap what the spike proved into `lib/ecf/firma.ts`, with the
-private key and certificate passed in, never read from disk inside the engine.
+`firmarECF` verifies its own signature before returning it: a key that does not
+belong to the certificate fails there, not in DGII's hands.
 
 **Commit:** `feat(ecf): XMLDSig signing, as DGII specifies it`
 
