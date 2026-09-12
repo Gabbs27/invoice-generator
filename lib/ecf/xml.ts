@@ -24,6 +24,8 @@ export interface Comprobante {
   IndicadorMontoGravado: 0 | 1;
   TipoIngresos: '01' | '02' | '03' | '04' | '05' | '06';
   TipoPago: 1 | 2 | 3;
+  // Solo en la venta a crédito (TipoPago 2), y ahí es obligatoria.
+  FechaLimitePago?: string;
   Emisor: {
     RNCEmisor: string;
     RazonSocialEmisor: string;
@@ -118,11 +120,23 @@ export function construirXML(comprobante: Comprobante): string {
   if (tipo === '32' && vencimiento !== undefined) {
     throw new Error('La factura de consumo (32) no lleva FechaVencimientoSecuencia.');
   }
-  // Formato e-CF, pág. 9: FechaLimitePago es condicional a que el tipo de pago sea a
-  // crédito, y esta versión todavía no la arma.
-  if (comprobante.TipoPago === 2) {
+  // Formato e-CF, pág. 9: FechaLimitePago es solo para facturas a crédito, y en ellas va.
+  const limitePago = comprobante.FechaLimitePago;
+  if (comprobante.TipoPago === 2 && limitePago === undefined) {
+    throw new Error('Una factura a crédito (TipoPago 2) lleva FechaLimitePago.');
+  }
+  if (comprobante.TipoPago !== 2 && limitePago !== undefined) {
+    throw new Error('FechaLimitePago es solo para facturas a crédito (TipoPago 2).');
+  }
+  // Tampoco puede ser anterior a la emisión. Una fecha dd-MM-AAAA al revés ordena como texto.
+  const ordenable = (valor: string) => valor.split('-').reverse().join('');
+  if (
+    limitePago !== undefined &&
+    ordenable(fecha(limitePago, 'FechaLimitePago')) <
+      ordenable(fecha(Emisor.FechaEmision, 'FechaEmision'))
+  ) {
     throw new Error(
-      'Una factura a crédito (TipoPago 2) lleva FechaLimitePago, y esta versión todavía no la arma.'
+      `FechaLimitePago (${limitePago}) no puede ser anterior a FechaEmision (${Emisor.FechaEmision}).`
     );
   }
   if (Items.length > 1000) throw new Error('Un e-CF lleva como máximo 1000 ítems.');
@@ -152,7 +166,8 @@ export function construirXML(comprobante: Comprobante): string {
       ? elemento('IndicadorMontoGravado', String(comprobante.IndicadorMontoGravado))
       : '') +
     elemento('TipoIngresos', comprobante.TipoIngresos) +
-    elemento('TipoPago', String(comprobante.TipoPago));
+    elemento('TipoPago', String(comprobante.TipoPago)) +
+    (limitePago === undefined ? '' : elemento('FechaLimitePago', limitePago));
 
   const emisor =
     elemento('RNCEmisor', rnc(Emisor.RNCEmisor, 'RNCEmisor')) +

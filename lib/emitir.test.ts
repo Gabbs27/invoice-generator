@@ -86,6 +86,20 @@ describe('emitir un e-CF', () => {
     expect((await validarContraXSD(resultado.xml, leerEsquema('31'))).valido).toBe(true);
   });
 
+  // Formato e-CF, pág. 9: a crédito lleva FechaLimitePago, que puede ser el día de la emisión.
+  it('emite una venta a crédito con su fecha límite de pago', async () => {
+    const resultado = await emitirECF(
+      { ...creditoFiscal, TipoPago: 2, FechaLimitePago: '12-09-2026' },
+      dependencias()
+    );
+    expect(resultado).toMatchObject({ emitido: true, eNCF: 'E310000000001' });
+    if (!resultado.emitido) return;
+    expect(resultado.xml).toContain(
+      '<TipoPago>2</TipoPago><FechaLimitePago>12-09-2026</FechaLimitePago>'
+    );
+    expect((await validarContraXSD(resultado.xml, leerEsquema('31'))).valido).toBe(true);
+  });
+
   it('avanza la secuencia en cada emisión', async () => {
     const deps = dependencias();
     await emitirECF(consumo, deps);

@@ -25,9 +25,9 @@ const TIPOS_DE_INGRESO = [
   ['06', 'Otros ingresos'],
 ] as const;
 
-// Sin el 2, crédito: lleva FechaLimitePago, que esta versión todavía no arma.
 const TIPOS_DE_PAGO = [
   ['1', 'Contado'],
+  ['2', 'Crédito'],
   ['3', 'Gratuito'],
 ] as const;
 
@@ -189,7 +189,7 @@ function Formulario({
               ayuda={
                 tipoPago === '3'
                   ? 'Una factura gratuita no es válida para crédito fiscal.'
-                  : 'Esta versión no emite ventas a crédito: DGII les pide fecha límite de pago.'
+                  : undefined
               }
             >
               <select
@@ -197,7 +197,7 @@ function Formulario({
                 name="TipoPago"
                 value={tipoPago}
                 onChange={(evento) => setTipoPago(evento.target.value)}
-                aria-describedby="tipo-pago-ayuda"
+                aria-describedby={tipoPago === '3' ? 'tipo-pago-ayuda' : undefined}
                 className={estilos.entrada}
               >
                 {TIPOS_DE_PAGO.map(([codigo, nombre]) => (
@@ -207,6 +207,7 @@ function Formulario({
                 ))}
               </select>
             </Campo>
+            {tipoPago === '2' && <FechaLimiteDePago />}
             <div className={estilos.campo}>
               <span className={estilos.etiqueta}>
                 ITBIS
@@ -510,6 +511,31 @@ function Campo({
         </p>
       )}
     </div>
+  );
+}
+
+// Formato e-CF, pág. 9: la venta a crédito lleva su fecha límite de pago. Si cambia el tipo
+// de pago, el campo se va con lo que tenía.
+function FechaLimiteDePago() {
+  const [fecha, setFecha] = useState('');
+  return (
+    <Campo
+      id="fecha-limite-pago"
+      etiqueta="Fecha límite de pago"
+      xsd="FechaLimitePago"
+      ayuda="No puede ser anterior a la fecha de emisión."
+    >
+      <input
+        id="fecha-limite-pago"
+        type="date"
+        name="FechaLimitePago"
+        value={fecha}
+        onChange={(evento) => setFecha(evento.target.value)}
+        required
+        aria-describedby="fecha-limite-pago-ayuda"
+        className={estilos.entrada}
+      />
+    </Campo>
   );
 }
 

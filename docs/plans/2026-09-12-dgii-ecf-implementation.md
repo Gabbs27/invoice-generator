@@ -620,10 +620,10 @@ tries again with the next one.
 
 **Found on 2026-09-12, while building the form:** `FechaLimitePago` is
 "Condicional a que el tipo de pago sea a crédito" in 31 and 32 (Formato e-CF,
-p.9: `dd-MM-AAAA`, not before `FechaEmision`). The engine does not emit it yet,
-so `construirXML` refuses `TipoPago` 2 and the form offers only contado (1) and
-gratuito (3). Pending decision: add `FechaLimitePago`, or leave credit sales out
-of v1.
+p.9: `dd-MM-AAAA`, not before `FechaEmision`). **Decided the same day: add it.**
+`construirXML` requires it with `TipoPago` 2, refuses it with any other payment
+type ("Solo para facturas a crédito") and writes it right after `TipoPago`, where
+the XSD puts it. The form asks for the date when the sale is on credit.
 
 The Server Action is a trust boundary: anyone can POST to it. `lib/formulario.ts`
 translates the posted text into DGII codes and rejects anything else; amounts,
