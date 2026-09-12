@@ -118,6 +118,13 @@ export function construirXML(comprobante: Comprobante): string {
   if (tipo === '32' && vencimiento !== undefined) {
     throw new Error('La factura de consumo (32) no lleva FechaVencimientoSecuencia.');
   }
+  // Formato e-CF, pág. 9: FechaLimitePago es condicional a que el tipo de pago sea a
+  // crédito, y esta versión todavía no la arma.
+  if (comprobante.TipoPago === 2) {
+    throw new Error(
+      'Una factura a crédito (TipoPago 2) lleva FechaLimitePago, y esta versión todavía no la arma.'
+    );
+  }
   if (Items.length > 1000) throw new Error('Un e-CF lleva como máximo 1000 ítems.');
 
   const totales = calcularTotales(Items, {

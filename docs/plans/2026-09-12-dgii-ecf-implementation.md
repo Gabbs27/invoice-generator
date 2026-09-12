@@ -618,6 +618,32 @@ sequence comes from what was written, so a failed attempt consumes no number.
 When two issues race for the same number, the second gets `EEXIST` and the flow
 tries again with the next one.
 
+**Found on 2026-09-12, while building the form:** `FechaLimitePago` is
+"Condicional a que el tipo de pago sea a crédito" in 31 and 32 (Formato e-CF,
+p.9: `dd-MM-AAAA`, not before `FechaEmision`). The engine does not emit it yet,
+so `construirXML` refuses `TipoPago` 2 and the form offers only contado (1) and
+gratuito (3). Pending decision: add `FechaLimitePago`, or leave credit sales out
+of v1.
+
+The Server Action is a trust boundary: anyone can POST to it. `lib/formulario.ts`
+translates the posted text into DGII codes and rejects anything else; amounts,
+lengths and RNC stay with the engine. The credential comes from the mode alone:
+locally, a missing `datos/certificado.p12` stops the issue, and it never falls
+back to the demo certificate, which would sign real sequence numbers with no
+fiscal value.
+
+`next dev` and `next start` bind to 127.0.0.1. Their default, 0.0.0.0, would let
+anyone on the local network issue invoices signed with the business's
+certificate.
+
+`next.config.ts`, each line checked by building without it:
+- `serverExternalPackages: ['xmllint-wasm']`: bundled, validation fails with
+  `ENOENT` on `xmllint.wasm`.
+- `outputFileTracingExcludes` for `datos/**` and `esquemas/docs/**`: the trace
+  follows the paths `lib/credencial.ts` and `lib/storage` build, and pulled
+  `datos/certificado.p12` and `datos/emisor.json` into the server output.
+  `esquemas/` is traced without help, so no include is needed.
+
 **Commit:** `feat(app): issue an e-CF`
 
 ### Task 13: Printed representation
@@ -646,8 +672,8 @@ e-NCF, digital certificate, DGII certification.
 
 ### Task 16: Deploy to Vercel
 
-Connect the repo, deploy, confirm the demo runs in memory mode and that signing
-is visibly disabled.
+Connect the repo, deploy, confirm the demo runs in memory mode and signs with
+the demonstration certificate, and that the page says so.
 
 ### Task 17: Update the portfolio
 
