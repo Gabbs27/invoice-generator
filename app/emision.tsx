@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState, type ReactNode } from 'react';
+import { startTransition, useActionState, useState, type ReactNode } from 'react';
 import {
   calcularMontoItem,
   calcularTotales,
@@ -142,7 +142,17 @@ function Formulario({
   );
 
   return (
-    <form action={accion} className={estilos.formulario}>
+    <form
+      // Con <form action>, React reinicia el formulario al terminar la acción: cada <select>
+      // vuelve en pantalla a la opción con que empezó mientras el estado conserva la elegida,
+      // y el siguiente envío mandaría una opción que nadie escogió.
+      onSubmit={(evento) => {
+        evento.preventDefault();
+        const datos = new FormData(evento.currentTarget);
+        startTransition(() => accion(datos));
+      }}
+      className={estilos.formulario}
+    >
       <fieldset disabled={!habilitado || emitiendo} className={estilos.contenido}>
         <section className={estilos.seccion} aria-labelledby="titulo-encabezado">
           <Titulo id="titulo-encabezado" letra="A">
