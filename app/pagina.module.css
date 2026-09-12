@@ -162,6 +162,48 @@
   line-height: 1.55;
 }
 
+.advertencia {
+  margin-top: 1.5rem;
+  padding: 1rem 1.3rem 1.1rem;
+  border: 1px solid var(--linea);
+  border-left: 4px solid var(--azul);
+  background: var(--papel-claro);
+  animation: aparecer 0.6s ease-out 0.1s both;
+}
+
+.advertenciaTitulo {
+  margin: 0 0 0.35rem;
+  font-family: var(--fuente-titulares), Georgia, serif;
+  font-size: 1.45rem;
+  font-weight: 400;
+}
+
+.advertencia p {
+  max-width: 52rem;
+  margin: 0 0 0.6rem;
+}
+
+.requisitos summary {
+  font-weight: 700;
+  color: var(--azul);
+  cursor: pointer;
+}
+
+.requisitos ul {
+  max-width: 52rem;
+  margin: 0.6rem 0;
+  padding-left: 1.2rem;
+}
+
+.requisitos li + li {
+  margin-top: 0.25rem;
+}
+
+.fuente {
+  font-size: 0.8rem;
+  color: var(--tinta-tenue);
+}
+
 .oculto {
   position: absolute;
   width: 1px;
