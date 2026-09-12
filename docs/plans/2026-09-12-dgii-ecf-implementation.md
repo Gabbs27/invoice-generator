@@ -20,38 +20,25 @@
 
 ---
 
-## Task 0 — Get the XSD schemas (BLOCKING, Gabriel does this)
+## Task 0 — XSD schemas (DONE)
 
-Nothing that validates XML can be written before this exists.
+The fifteen schemas are in `esquemas/`, each with its sha256, size, URL and DGII
+publication date in `esquemas/MANIFIESTO.json`.
 
-DGII answers HTTP 403 to scripted downloads and 401 to its document library
-listing, so this cannot be automated.
+This task was first written as manual, on the belief that DGII blocked scripted
+downloads. It does not: the portal answers 403 to curl's and fetch's User-Agent
+and 200 to a browser's. `scripts/bajar-esquemas.mjs` downloads with browser
+headers and, without `--actualizar`, exits 1 when DGII has changed a schema since
+the manifest was written — or when a local XSD no longer matches it.
 
-**Steps:**
+**Before every release:** `node scripts/bajar-esquemas.mjs`. Types 33 and 34
+changed on 2026-04-01, six months after the rest; a validator running against a
+stale XSD passes XML that DGII rejects.
 
-1. Open <https://dgii.gov.do/cicloContribuyente/facturacion/comprobantesFiscalesElectronicosE-CF/Paginas/default.aspx> in a browser.
-2. Navigate to *Documentación sobre eCF → Formatos XML*.
-3. Download the XSD schemas for e-CF v1.0 (there are ten, one per document type), plus the format specification PDFs.
-4. Place them in `esquemas/` in the repo:
-
-```
-esquemas/
-  ECF_31_v1.0.xsd
-  ECF_32_v1.0.xsd
-  ...
-  docs/Formato-e-CF-v1.0.pdf
-```
-
-5. Commit.
-
-```bash
-git add esquemas/
-git commit -m "chore: DGII e-CF XSD schemas v1.0, downloaded by hand"
-```
-
-**Verification:** `ls esquemas/*.xsd | wc -l` prints a number greater than zero, and each file begins with `<?xml` and contains `xs:schema`.
-
-**If the schemas turn out not to be publicly downloadable:** stop and report. Do not transcribe the PDF into a hand-written validator and call it schema validation — that is a different, weaker check wearing the same name.
+**Filenames are DGII's own, with spaces and no consistent pattern**
+(`e-CF 31 v.1.0.xsd`, `ARECF v1.0.xsd`, `ANECF v.1.0.xsd`). Resolve a document
+type to its file through the manifest's `tipo` field; never build the name by
+concatenating strings.
 
 ---
 
