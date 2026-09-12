@@ -503,6 +503,7 @@ export interface Almacenamiento {
   leerEmisor(): Promise<Emisor>;
   proximaSecuencia(tipo: TipoECF): Promise<number>;
   guardarComprobante(encf: string, xml: string): Promise<void>;
+  leerComprobante(encf: string): Promise<string>;
   listarComprobantes(tipo?: TipoECF): Promise<string[]>;
 }
 ```
@@ -510,6 +511,12 @@ export interface Almacenamiento {
 `guardarComprobante` must reject a duplicate e-NCF. In memory that is a `Map`
 check; on disk it is the filesystem. Both implementations share the same test
 suite, so the behaviour cannot drift between them.
+
+`leerComprobante` was added while building it: without it the shared suite
+cannot prove that a rejected duplicate leaves the original XML untouched, and
+printing and the 606/607 reports need to read what was issued anyway. The suite
+lives in `lib/storage/contrato.ts`; the sequence rules both implementations
+apply live in `lib/storage/secuencias.ts`.
 
 **Commit:** `feat(storage): interface and in-memory implementation`
 
