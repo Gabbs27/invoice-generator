@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# datos del emisor: comprobantes reales y el .p12, nunca en git
+/datos/
+*.p12
