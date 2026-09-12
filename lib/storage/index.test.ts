@@ -5,11 +5,18 @@ import { join } from 'node:path';
 import { AlmacenamientoEnArchivos } from './archivos';
 import { emisorDePrueba } from './contrato';
 import { AlmacenamientoEnMemoria } from './memoria';
-import { EMISOR_DE_DEMOSTRACION, crearAlmacenamiento, modoDeEjecucion } from './index';
+import {
+  CLAVE_DEL_PROCESO,
+  EMISOR_DE_DEMOSTRACION,
+  crearAlmacenamiento,
+  modoDeEjecucion,
+} from './index';
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetModules();
+  // El almacenamiento del proceso vive en globalThis: cada prueba empieza sin él.
+  delete (globalThis as Record<string, unknown>)[CLAVE_DEL_PROCESO];
 });
 
 describe('almacenamiento según el entorno', () => {
@@ -50,5 +57,17 @@ describe('almacenamiento según el entorno', () => {
     await primero.guardarComprobante('E320000000001', '<a/>');
     expect(obtenerAlmacenamiento()).toBe(primero);
     expect(await obtenerAlmacenamiento().proximaSecuencia('32')).toBe(2);
+  });
+
+  // Next carga cada ruta con su propia copia de los módulos: la ruta que imprime el PDF tiene
+  // que ver lo que guardó la página que emite.
+  it('entrega el mismo almacenamiento aunque el módulo se cargue otra vez', async () => {
+    vi.stubEnv('VERCEL', '1');
+    const pagina = await import('./index');
+    await pagina.obtenerAlmacenamiento().guardarComprobante('E320000000001', '<a/>');
+    vi.resetModules();
+    const ruta = await import('./index');
+    expect(ruta).not.toBe(pagina);
+    expect(await ruta.obtenerAlmacenamiento().leerComprobante('E320000000001')).toBe('<a/>');
   });
 });
