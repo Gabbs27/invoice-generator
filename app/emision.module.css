@@ -538,6 +538,15 @@ select.entrada {
   overflow-wrap: anywhere;
 }
 
+.enlaces {
+  margin: 0 0 0.8rem;
+}
+
+.enlaces a {
+  font-weight: 700;
+  color: var(--azul);
+}
+
 .xml summary {
   font-weight: 700;
   color: var(--azul);

@@ -10,6 +10,7 @@ import {
 } from '@/lib/ecf/calculo';
 import { nombreTipo } from '@/lib/ecf/tipos';
 import type { ResultadoDeEmision } from '@/lib/emitir';
+import { conMiles } from '@/lib/formato';
 import type { Modo } from '@/lib/storage';
 import { emitir } from './acciones';
 import estilos from './emision.module.css';
@@ -78,12 +79,6 @@ function siSePuede<T>(calcular: () => T): T | null {
   } catch {
     return null;
   }
-}
-
-// '1234567.50' → '1,234,567.50', sin pasar por punto flotante.
-function conMiles(monto: string): string {
-  const [enteros, decimales] = monto.split('.');
-  return `${enteros.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${decimales}`;
 }
 
 export function Emision({ modo, habilitado }: { modo: Modo; habilitado: boolean }) {
@@ -623,6 +618,11 @@ function Resultado({ resultado, modo }: { resultado: ResultadoDeEmision | null; 
               No se envió a DGII: esta versión no transmite.
             </li>
           </ul>
+          <p className={estilos.enlaces}>
+            <a href={`/facturas/${resultado.eNCF}`} target="_blank" rel="noreferrer">
+              Ver la representación impresa (PDF)
+            </a>
+          </p>
           <details className={estilos.xml}>
             <summary>Ver el XML firmado</summary>
             <pre>{resultado.xml}</pre>

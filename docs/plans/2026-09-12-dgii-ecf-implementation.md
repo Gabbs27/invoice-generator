@@ -652,6 +652,27 @@ certificate.
 code. **Verify what the QR must contain before generating one** — it encodes a
 DGII verification URL whose exact shape is in the technical documentation.
 
+**Verified on 2026-09-12 (Informe Técnico e-CF v1.0, section 18, pp.31–40):** the
+QR goes bottom left, at least 2 cm from the edge and 22 × 22 mm, and encodes
+`https://ecf.dgii.gov.do/ecf/ConsultaTimbre` with `RncEmisor`, `RncComprador`,
+`ENCF`, `FechaEmision`, `MontoTotal`, `FechaFirma` and `CodigoSeguridad`. A
+factura de consumo under DOP$250,000.00 uses
+`https://fc.dgii.gov.do/eCF/ConsultaTimbreFC` with `RncEmisor`, `ENCF`,
+`MontoTotal` and `CodigoSeguridad`. The text calls `CodigoSeguridad` "los primeros
+seis (6) dígitos del hash generado en el SignatureValue"; the document's own
+models print codes like `C78q+V`, so it is the first six characters of the base64
+`SignatureValue`. It is printed under the QR, with the signing date and time.
+
+**Decided the same day:** no per-item ITBIS column, because the XML carries ITBIS
+per rate only and the totals print it as the XML has it. The issuer's municipio
+and provincia go inside the address, as in DGII's models, with no new fields.
+The QR comes from `qrcode-generator`, and a test decodes it with `jsqr`.
+
+The PDF embeds Atkinson Hyperlegible Next (`@fontsource/atkinson-hyperlegible-next`,
+OFL): with the standard Helvetica, which is not embedded, poppler drew no text at
+all. Known gap: a representation longer than one page numbers its pages but does
+not print the per-page subtotals the Informe Técnico asks for (pp.36–37).
+
 **Commit:** `feat(app): printed representation`
 
 ### Task 14: 606 / 607 export
