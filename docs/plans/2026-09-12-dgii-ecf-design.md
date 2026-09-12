@@ -144,15 +144,18 @@ Todo lo siguiente sale de documentación de DGII o de su portal:
   obligaciones tributarias. DGII habilita un ambiente de pruebas tras
   pre-aprobar la solicitud.
 
-## Riesgo abierto
+## Riesgo resuelto, y el que lo reemplaza
 
-**Los XSD hay que bajarlos a mano.** El portal de DGII responde HTTP 403 a
-descargas automatizadas y 401 al listado de su biblioteca de documentos. Los
-esquemas se bajan desde un navegador, de *Documentación sobre eCF → Formatos
-XML*, y se commitean al repo.
+Se creyó que el portal de DGII bloqueaba las descargas automatizadas y este
+documento lo afirmó. Era falso: responde 403 al User-Agent de curl y 200 al de un
+navegador. Los quince esquemas están en `esquemas/`, bajados por
+`scripts/bajar-esquemas.mjs`, con su sha256 y la fecha de modificación que
+publica DGII en `esquemas/MANIFIESTO.json`.
 
-Hasta que ese archivo exista, «el XML es válido» es una afirmación sin nada
-debajo. Es el primer paso del plan y bloquea la validación.
+El riesgo que queda es otro y no se resuelve una vez: **DGII cambia esquemas.**
+Los de los tipos 33 y 34 se modificaron el 1 de abril de 2026, seis meses después
+del resto. El script, sin `--actualizar`, sale con código 1 si algún esquema
+cambió desde el manifiesto, y se corre antes de cada release.
 
 ## Cómo se verifica
 
