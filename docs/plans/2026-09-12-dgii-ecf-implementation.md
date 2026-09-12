@@ -301,23 +301,58 @@ first.
 
 ### Task 5: ITBIS and totals
 
+**Rewritten on 2026-09-12 against DGII's documents.** The first version rounded
+each line and summed, and reversed the sign on credit notes. DGII does neither.
+Page numbers are the printed ones in `esquemas/docs/Formato-e-CF-v1.0.pdf` (F)
+and `esquemas/docs/Informe-Tecnico-e-CF-v1.0.pdf` (IT).
+
 **Files:**
 - Create: `lib/ecf/calculo.ts`
 - Test: `lib/ecf/calculo.test.ts`
 
 Rules to encode, each with its own test:
 
-- The general ITBIS rate is 18%. It is a parameter, not a literal buried in the
-  code, because rates change by law and by product category.
-- Rounding is to two decimals, and the test must include a case where per-line
-  rounding and total rounding disagree — that difference is a real category of
-  invoice dispute, and the plan is to round at the line and sum the rounded
-  values.
-- Exempt lines contribute to the subtotal and not to the tax.
-- A credit note (type 34) carries the same arithmetic with reversed sign.
+- **MontoItem** = (PrecioUnitarioItem × CantidadItem) − DescuentoMonto +
+  RecargoMonto (F p.44). The price has up to 4 decimals; the quantity up to 2 and
+  is greater than zero; every amount has 2 (XSD).
+- **Rounding:** two decimals; a third decimal of 5 or more raises the second
+  (IT p.22, with DGII's examples 750.5212 → 750.52 and 750.5276 → 750.53). It
+  applies to every amount of 16 integer digits and 2 decimals (F p.18, note 11).
+  Compute in integers, not floats: `1.005 * 100` is `100.49999999999999` in
+  JavaScript.
+- **ITBIS is computed on the taxed total of each rate, not per line.**
+  MontoGravadoI1 is the sum of MontoItem with IndicadorFacturacion 1, and
+  TotalITBIS1 = MontoGravadoI1 × ITBIS1; the same for rates 2 and 3
+  (F pp.19–21). Items carry no ITBIS amount. The test includes lines whose
+  per-line ITBIS would add up to a different number.
+- **Indicators** (F p.36): 1 = ITBIS1, 2 = ITBIS2, 3 = ITBIS3, 4 = exento.
+  Exempt items go to MontoExento and never to the tax.
+- **Rates are a parameter.** The XML declares them in ITBIS1–3 as integers of
+  one or two digits (XSD); the Formato describes them as 18, 16 and 0
+  (F pp.20–21).
+- **Prices with ITBIS included** (IndicadorMontoGravado = 1, F p.7): the taxed
+  amount is the sum divided by (1 + rate) (F p.19). Exempt items are not
+  divided. The total can end up a cent above what was charged; DGII tolerates a
+  global difference of one unit per detail line (IT p.21).
+- **MontoGravadoTotal** = I1 + I2 + I3 (F p.18); **MontoTotal** =
+  MontoGravadoTotal + MontoExento + TotalITBIS (F p.25). The fields of a rate no
+  item uses are left out: DGII marks them conditional.
+- **Credit notes (type 34)** use the same arithmetic with positive amounts; the
+  type-34 XSD does not accept negative totals. The note's MontoTotal cannot
+  exceed the modified e-CF's total, counting earlier notes against it (F p.25,
+  note 30).
 
-**Do not add retenciones until there is a verified rule for them.** Leave the
-field out rather than guess a percentage.
+**Not in v1, by decision or for lack of a verified rule:**
+
+- Global discounts and surcharges. With them, the Formato gives two readings of
+  when to divide by (1 + rate) (F p.19); without them, both agree.
+- IndicadorFacturacion 0 (no facturable).
+- Additional taxes: ISC and the rest (F pp.21–25, IT pp.22–30).
+- Retenciones: the fields exist (F p.36); the percentages are in no document.
+- A credit note issued more than 30 days after the obligation arose restores
+  the price without the ITBIS (IT p.17; IndicadorNotaCredito, F p.7). The
+  documents do not say how that changes the note's totals. Ask before encoding
+  it.
 
 **Commit:** `feat(ecf): ITBIS and totals`
 
