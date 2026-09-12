@@ -6,7 +6,7 @@
 
 **Architecture:** Next.js, one codebase in two modes. Locally the folder `./datos/` is the database and holds the `.p12`; on Vercel storage is in-memory and signing is disabled. The fiscal engine lives in `lib/ecf/` as pure TypeScript with no I/O, so it is testable without a browser, a certificate or a disk. Writing the signed XML with the `wx` flag is what makes a duplicate e-NCF impossible.
 
-**Tech Stack:** Next.js 15, TypeScript, Vitest, `@react-pdf/renderer` (kept from the current app), `xmllint-wasm` for XSD validation, `node-forge` + `xadesjs` for XAdES-BES.
+**Tech Stack:** Next.js 16, TypeScript, Vitest, `@react-pdf/renderer` (kept from the current app), `xmllint-wasm` for XSD validation, `node-forge` to read the `.p12`, and the XMLDSig library the Task 8 spike picks.
 
 **Design:** `docs/plans/2026-09-12-dgii-ecf-design.md`
 
@@ -374,35 +374,50 @@ names come from the XSD committed in Task 0, not from memory.
 ### Task 7: XSD validation
 
 **Files:**
-- Create: `lib/ecf/validar.ts`
-- Test: `lib/ecf/validar.test.ts`
+- Create: `lib/ecf/validar.ts` — pure: takes the XML and the schema's text
+- Create: `lib/esquemas.ts` — outside the engine: reads a schema by `tipo`
+  through `esquemas/MANIFIESTO.json` and checks its sha256
+- Test: `lib/ecf/validar.test.ts`, `lib/esquemas.test.ts`
 
 **Step 1: Install a validator with no native build**
 
 ```bash
-npm install -D xmllint-wasm
+npm install xmllint-wasm
 ```
 
-`libxmljs2` is the usual choice and needs native compilation, which breaks on
-Vercel. WASM does not.
+A runtime dependency, not a dev one: the app validates every comprobante before
+saving it. `libxmljs2` is the usual choice and needs native compilation, which
+breaks on Vercel. WASM does not.
+
+**DGII's e-CF 31 schema does not compile.** It references
+`IndicadorServicioTodoIncluidoType` and never defines it. The 33, 34, 44 and 45
+schemas define it identically; the 32 differs only in whitespace. Decided with
+Gabriel on 2026-09-12: the committed file stays byte-for-byte what DGII
+publishes, and `validar.ts` adds that one definition in memory when a schema
+uses the type without defining it. Three tests keep the patch honest:
+
+- the added definition is the one in `e-CF 33 v.1.0.xsd`, byte for byte;
+- a schema that already defines the type comes back untouched;
+- the published e-CF 31 schema, unpatched, still fails to compile. The day DGII
+  fixes it, that test goes red and the patch comes out.
 
 **Step 2: The test has to fail on bad XML, and that is the whole point**
 
 ```ts
 it('acepta un e-CF bien formado', async () => {
-  const resultado = await validarContraXSD(xmlValido, '31');
+  const resultado = await validarContraXSD(xmlValido, esquema31);
   expect(resultado.valido).toBe(true);
 });
 
 it('rechaza un e-CF al que le falta el e-NCF', async () => {
-  const resultado = await validarContraXSD(xmlSinENCF, '31');
+  const resultado = await validarContraXSD(xmlSinENCF, esquema31);
   expect(resultado.valido).toBe(false);
   expect(resultado.errores.join(' ')).toMatch(/eNCF/i);
 });
 
 // Control: el validador tiene que poder distinguir algo.
 it('rechaza XML que no es un e-CF en absoluto', async () => {
-  const resultado = await validarContraXSD('<hola/>', '31');
+  const resultado = await validarContraXSD('<hola/>', esquema31);
   expect(resultado.valido).toBe(false);
 });
 ```
@@ -411,30 +426,60 @@ That third test is the one that matters. A validator wired to the wrong schema
 path, or one that swallows its own errors, returns `true` for everything — and a
 check that always passes looks exactly like a check that passes.
 
+The XSD reserves a mandatory `xs:any` slot for the Signature, so an unsigned
+e-CF never validates. Validation happens after signing, which matters for the
+Vercel demo, where signing is disabled (Tasks 11 and 12).
+
 **Commit:** `feat(ecf): validate the XML against DGII's XSD`
 
 ---
 
-### Task 8: XAdES-BES signature — spike first
+### Task 8: XMLDSig signature — spike first
+
+**Corrected on 2026-09-12.** The design and the first version of this plan said
+XAdES-BES. DGII's own signing specification, `esquemas/docs/Firmado-de-e-CF.pdf`,
+describes a plain enveloped XMLDSig signature, and nothing in it is XAdES:
+
+- `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">`, appended as the last
+  child of `<ECF>`: the `xs:any` slot the XSD reserves after `FechaHoraFirma`;
+- `CanonicalizationMethod`: `http://www.w3.org/TR/2001/REC-xml-c14n-20010315`;
+- `SignatureMethod`: `http://www.w3.org/2001/04/xmldsig-more#rsa-sha256`;
+- a single `Reference` with an empty `URI=""`, so the signature covers the whole
+  document (p.2), and the `http://www.w3.org/2000/09/xmldsig#enveloped-signature`
+  transform;
+- `DigestMethod`: `http://www.w3.org/2001/04/xmlenc#sha256`. SHA-256 is
+  mandatory (p.2);
+- `KeyInfo` → `X509Data` → `X509Certificate`.
+
+Take the URIs from the code samples, not from the example XML on p.3, which
+misspells three of them (`RECxml-c14n`, `xmldsigmore`, `envelope d-signature`).
+The TypeScript sample (pp.5–12) also puts `SignatureValue` after `KeyInfo`;
+XMLDSig, and the example on p.3, put it right after `SignedInfo`.
 
 **This task starts with a spike, not with code.** The library APIs here are not
 something to assume.
 
-**Step 1: Spike**
+**Step 1: Spike**, in a scratch directory outside the repo:
 
-Create a scratch script that:
-1. Generates a self-signed `.p12` with `openssl` for testing.
-2. Reads it with `node-forge` and extracts the private key and certificate.
-3. Signs a small XML with `xadesjs` + `@peculiar/webcrypto`.
-4. Verifies the signature back.
+1. Generate self-signed `.p12` files with `openssl`, one with OpenSSL 3's
+   default encryption and one with `-legacy`: certificates from real CAs come
+   either way.
+2. Read them with `node-forge` and extract the private key and certificate.
+3. Sign an e-CF built by `construirXML` with a maintained XMLDSig library
+   (`xml-crypto` first, `xmldsigjs` if it falls short), producing exactly the
+   structure above.
+4. Verify the signature back with the library, and independently: recompute
+   the digest and check the RSA signature with a second canonicalizer
+   (libxml2's, through `xmllint-wasm`) and Node's `crypto`.
+5. Validate the signed XML against the XSD, as Task 7 does.
 
 If any step does not work, report it before going further. Do not proceed on a
 signature that has never been verified.
 
 **Step 2 onward:** wrap what the spike proved into `lib/ecf/firma.ts`, with the
-private key passed in, never read from disk inside the engine.
+private key and certificate passed in, never read from disk inside the engine.
 
-**Commit:** `feat(ecf): XAdES-BES signing`
+**Commit:** `feat(ecf): XMLDSig signing, as DGII specifies it`
 
 ---
 
