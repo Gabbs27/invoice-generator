@@ -1,0 +1,20 @@
+5e68c80 docs: the XSDs were never blocked, only filtered by User-Agent
+be9b58c chore: DGII e-CF XSD schemas v1.0, with a script that notices when they change
+029951d chore: destination for the DGII XSD schemas
+80b35ca docs: implementation plan for the e-CF issuer
+4e03b72 docs: design for the DGII e-CF issuer
+798a9c1 Merge pull request #5 from Gabbs27/dependabot/npm_and_yarn/rollup-2.79.2
+4f28363 Bump rollup from 2.79.1 to 2.79.2
+99569d3 Merge pull request #4 from Gabbs27/dependabot/npm_and_yarn/multi-6b7e5c81f3
+0cc9863 Bump body-parser and express
+aab1134 Merge pull request #1 from Gabbs27/deploy
+b334dbf primero
+0e47efa eliminando jekyll
+42d8a3b cambiosen json
+cae2ad0 Create jekyll-gh-pages.yml
+9dddc6f Prueba
+a0034fe nada de nada
+40b6db7 Create jekyll-gh-pages.yml
+4dc3594 Unregister
+be22c38 Generador de Facturas REACTJS
+b2dde3f Initialize project using Create React App
