@@ -677,6 +677,29 @@ not print the per-page subtotals the Informe Técnico asks for (pp.36–37).
 
 ### Task 14: 606 / 607 export
 
+**Found on 2026-09-12**, in DGII's "Formato de Envío 607 (Norma General 07-2018 y
+05-2019)" package: its instructivo (September 2020) and "Herramienta de Envio
+Formato 607.xls" (last saved May 2023).
+- The 607 is monthly, due by the 15th. It has a header (RNC, period `AAAAMM`, a
+  record count of at most 65,000) and 23 detail fields: the buyer's RNC, cédula or
+  passport and its type, NCF, modified NCF, TipoIngresos, date `AAAAMMDD`,
+  retention date, amount without taxes, ITBIS, retentions and other taxes, legal
+  tip, and the amount paid by each payment method (cash, cheque/transfer/deposit,
+  card, credit, gift bonds, barter, other), which must add up to the invoice total.
+- Facturas de consumo under RD$250,000.00 are not itemized; they go as a count
+  and a total in the Oficina Virtual's summary.
+- The Excel tool's macros generate the TXT. The instructivo does not write down
+  its layout, and the readable part of the macros is the legacy fixed-width format.
+- Neither document mentions e-CF. The tool validates B-series NCF, and nothing
+  shows that it accepts an e-NCF.
+- The 606 needs purchases, which the app does not record.
+
+**Decided the same day:** paused until Gabriel confirms with DGII whether an
+e-CF issuer files the 607 for its e-CF, and with which NCF. If it goes ahead, the
+output is a CSV with the instructivo's 23 fields, to paste into DGII's tool,
+which generates and validates the TXT. The form then gains the payment method,
+because contado does not say how a sale was paid.
+
 **Commit:** `feat(app): 606 and 607 reports`
 
 ### Task 15: Say plainly what this is not
