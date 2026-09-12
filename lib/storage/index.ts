@@ -31,10 +31,13 @@ export function crearAlmacenamiento(
     : new AlmacenamientoEnArchivos(directorio);
 }
 
-let almacenamiento: Almacenamiento | undefined;
+// Uno por proceso: en memoria, lo emitido tiene que durar de una petición a la siguiente. Y
+// va en globalThis porque Next carga cada ruta con su propia copia de este módulo: con una
+// variable del módulo, la página que emite y la ruta que imprime tendrían almacenamientos
+// distintos.
+export const CLAVE_DEL_PROCESO = '__invoiceGeneratorAlmacenamiento';
 
-// Uno por proceso: en memoria, lo emitido tiene que durar de una petición a la siguiente.
 export function obtenerAlmacenamiento(): Almacenamiento {
-  almacenamiento ??= crearAlmacenamiento(modoDeEjecucion());
-  return almacenamiento;
+  const proceso = globalThis as unknown as Record<string, Almacenamiento | undefined>;
+  return (proceso[CLAVE_DEL_PROCESO] ??= crearAlmacenamiento(modoDeEjecucion()));
 }
