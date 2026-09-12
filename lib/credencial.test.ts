@@ -4,7 +4,11 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import forge from 'node-forge';
-import { crearCredencialDeDemostracion, leerCredencialLocal } from './credencial';
+import {
+  crearCredencialDeDemostracion,
+  leerCredencialLocal,
+  obtenerCredencial,
+} from './credencial';
 import { firmarECF } from './ecf/firma';
 import { construirXML } from './ecf/xml';
 
@@ -111,6 +115,38 @@ describe('credencial de firma', () => {
     conCarpeta(async (directorio) => {
       writeFileSync(join(directorio, 'certificado.p12'), p12DePrueba('clave').bytes);
       await expect(leerCredencialLocal(directorio, {})).rejects.toThrow(/CERTIFICADO_CLAVE/);
+    })
+  );
+});
+
+describe('credencial según el modo', () => {
+  // Generar una llave RSA en cada emisión sería lento, y no cambia nada: ninguna vale.
+  it('la demostración firma con un solo certificado en memoria por proceso', async () => {
+    const primera = await obtenerCredencial('demostracion');
+    const segunda = await obtenerCredencial('demostracion');
+    expect(segunda.certificado).toBe(primera.certificado);
+    expect(new X509Certificate(primera.certificado).subject).toMatch(/sin valor fiscal/);
+  });
+
+  // Caer en la demostración guardaría en datos/ comprobantes con una firma sin valor.
+  it(
+    'en local nunca cae en la demostración: sin certificado.p12 no hay credencial',
+    conCarpeta(async (directorio) => {
+      await expect(
+        obtenerCredencial('local', directorio, { CERTIFICADO_CLAVE: 'clave' })
+      ).rejects.toThrow(/certificado\.p12/);
+    })
+  );
+
+  it(
+    'en local firma con datos/certificado.p12',
+    conCarpeta(async (directorio) => {
+      const { bytes, huella } = p12DePrueba('clave-de-prueba');
+      writeFileSync(join(directorio, 'certificado.p12'), bytes);
+      const credencial = await obtenerCredencial('local', directorio, {
+        CERTIFICADO_CLAVE: 'clave-de-prueba',
+      });
+      expect(new X509Certificate(credencial.certificado).fingerprint256).toBe(huella);
     })
   );
 });

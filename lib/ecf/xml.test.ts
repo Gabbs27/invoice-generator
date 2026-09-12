@@ -179,6 +179,8 @@ describe('XML del e-CF', () => {
       /FechaVencimientoSecuencia/,
     ],
     ['una factura de crédito fiscal sin comprador', { Comprador: undefined }, /comprador/],
+    // Formato e-CF, pág. 9: FechaLimitePago es condicional a que el tipo de pago sea a crédito.
+    ['una factura a crédito, que lleva FechaLimitePago', { TipoPago: 2 }, /FechaLimitePago/],
     ['un RNC de emisor mal formado', { Emisor: { ...emisor, RNCEmisor: '12345678' } }, /RNCEmisor/],
     [
       'un RNC de comprador mal formado',

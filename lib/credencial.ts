@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import forge from 'node-forge';
 import { leerCertificadoP12, type Credencial } from './ecf/firma';
+import type { Modo } from './storage';
 
 // La demostración firma con un certificado autofirmado hecho en el momento: no tiene valor
 // fiscal ni es la identidad de nadie. Cada llamada genera uno nuevo, así que no hay una
@@ -52,4 +53,20 @@ export async function leerCredencialLocal(
   const clave = entorno.CERTIFICADO_CLAVE;
   if (!clave) throw new Error('Falta CERTIFICADO_CLAVE: la clave de certificado.p12, en .env.local.');
   return leerCertificadoP12(bytes, clave);
+}
+
+let credencialDeDemostracion: Credencial | undefined;
+
+// La credencial sale del modo y de nada más. En local no hay plan B: sin certificado.p12 no
+// se firma, porque la de demostración guardaría en datos/ comprobantes con una firma sin valor.
+export async function obtenerCredencial(
+  modo: Modo,
+  directorio = join(process.cwd(), 'datos'),
+  entorno: Record<string, string | undefined> = process.env
+): Promise<Credencial> {
+  if (modo === 'demostracion') {
+    credencialDeDemostracion ??= crearCredencialDeDemostracion();
+    return credencialDeDemostracion;
+  }
+  return leerCredencialLocal(directorio, entorno);
 }
