@@ -10,6 +10,7 @@ export interface SolicitudDeEmision {
   IndicadorMontoGravado: Comprobante['IndicadorMontoGravado'];
   TipoIngresos: Comprobante['TipoIngresos'];
   TipoPago: Comprobante['TipoPago'];
+  FechaLimitePago?: Comprobante['FechaLimitePago'];
   Comprador?: Comprobante['Comprador'];
   Items: ItemComprobante[];
 }
@@ -64,6 +65,7 @@ export async function emitirECF(
         IndicadorMontoGravado: solicitud.IndicadorMontoGravado,
         TipoIngresos: solicitud.TipoIngresos,
         TipoPago: solicitud.TipoPago,
+        FechaLimitePago: solicitud.FechaLimitePago,
         Emisor: {
           RNCEmisor: emisor.RNCEmisor,
           RazonSocialEmisor: emisor.RazonSocialEmisor,

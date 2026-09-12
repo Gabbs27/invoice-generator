@@ -168,6 +168,15 @@ describe('XML del e-CF', () => {
     expect(() => construirXML(comprobante)).not.toThrow();
   });
 
+  // Formato e-CF, pág. 9: FechaLimitePago va después de TipoPago, y puede ser el mismo día
+  // de la emisión.
+  it('arma una venta a crédito con su fecha límite de pago', () => {
+    const xml = construirXML(facturaCredito({ TipoPago: 2, FechaLimitePago: '12-09-2026' }));
+    expect(xml).toContain(
+      '<TipoPago>2</TipoPago><FechaLimitePago>12-09-2026</FechaLimitePago></IdDoc>'
+    );
+  });
+
   // El control negativo: lo que el XSD o el Formato no admiten. Cada caso nombra el
   // error que espera, para que un fallo cualquiera (un TypeError) no pase por rechazo.
   it.each<[string, Partial<Comprobante>, RegExp]>([
@@ -179,8 +188,23 @@ describe('XML del e-CF', () => {
       /FechaVencimientoSecuencia/,
     ],
     ['una factura de crédito fiscal sin comprador', { Comprador: undefined }, /comprador/],
-    // Formato e-CF, pág. 9: FechaLimitePago es condicional a que el tipo de pago sea a crédito.
-    ['una factura a crédito, que lleva FechaLimitePago', { TipoPago: 2 }, /FechaLimitePago/],
+    // Formato e-CF, pág. 9: FechaLimitePago es solo para facturas a crédito, y en ellas va.
+    ['una venta a crédito sin FechaLimitePago', { TipoPago: 2 }, /lleva FechaLimitePago/],
+    [
+      'FechaLimitePago en una venta de contado',
+      { FechaLimitePago: '30-09-2026' },
+      /solo para facturas a crédito/,
+    ],
+    [
+      'una FechaLimitePago sin el formato dd-MM-AAAA',
+      { TipoPago: 2, FechaLimitePago: '2026-09-30' },
+      /FechaLimitePago inválida/,
+    ],
+    [
+      'una FechaLimitePago anterior a la emisión',
+      { TipoPago: 2, FechaLimitePago: '11-09-2026' },
+      /anterior a FechaEmision/,
+    ],
     ['un RNC de emisor mal formado', { Emisor: { ...emisor, RNCEmisor: '12345678' } }, /RNCEmisor/],
     [
       'un RNC de comprador mal formado',

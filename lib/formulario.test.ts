@@ -107,4 +107,23 @@ describe('formulario de emisión', () => {
       /ítems llegaron incompletos/
     );
   });
+
+  // El campo de fecha del navegador manda AAAA-MM-DD; el Formato e-CF la pide dd-MM-AAAA.
+  it('pasa la fecha límite de pago al formato del Formato e-CF', () => {
+    const solicitud = leerSolicitud(
+      formulario({ ...completo, TipoPago: '2', FechaLimitePago: '2026-09-30' })
+    );
+    expect(solicitud).toMatchObject({ TipoPago: 2, FechaLimitePago: '30-09-2026' });
+  });
+
+  it('sin fecha límite de pago no manda FechaLimitePago', () => {
+    const solicitud = leerSolicitud(formulario({ ...completo, FechaLimitePago: '' }));
+    expect(solicitud.FechaLimitePago).toBeUndefined();
+  });
+
+  it('rechaza una fecha límite de pago que no viene como AAAA-MM-DD', () => {
+    expect(() =>
+      leerSolicitud(formulario({ ...completo, TipoPago: '2', FechaLimitePago: '30/09/2026' }))
+    ).toThrow('FechaLimitePago inválida: 30/09/2026.');
+  });
 });

@@ -28,6 +28,15 @@ function codigo<T extends string>(valor: string, campo: string, codigos: readonl
   return valor as T;
 }
 
+// El campo de fecha del navegador manda AAAA-MM-DD, y el Formato e-CF la pide dd-MM-AAAA.
+// Que la fecha exista lo valida el motor.
+function fechaDelNavegador(valor: string, campo: string): string | undefined {
+  if (valor === '') return undefined;
+  const partes = valor.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!partes) throw new Error(`${campo} inválida: ${valor}.`);
+  return `${partes[3]}-${partes[2]}-${partes[1]}`;
+}
+
 export function leerSolicitud(datos: FormData): SolicitudDeEmision {
   const campo = (nombre: string) => texto(datos.get(nombre));
 
@@ -59,6 +68,7 @@ export function leerSolicitud(datos: FormData): SolicitudDeEmision {
   const RNCComprador = campo('RNCComprador').replace(/[\s-]/g, '');
   const RazonSocialComprador = campo('RazonSocialComprador');
   const hayComprador = RNCComprador !== '' || RazonSocialComprador !== '';
+  const FechaLimitePago = fechaDelNavegador(campo('FechaLimitePago'), 'FechaLimitePago');
 
   return {
     tipo: codigo(campo('tipo'), 'tipo', ['31', '32']),
@@ -74,6 +84,7 @@ export function leerSolicitud(datos: FormData): SolicitudDeEmision {
       '06',
     ]),
     TipoPago: Number(codigo(campo('TipoPago'), 'TipoPago', ['1', '2', '3'])) as 1 | 2 | 3,
+    ...(FechaLimitePago === undefined ? {} : { FechaLimitePago }),
     ...(hayComprador ? { Comprador: { RNCComprador, RazonSocialComprador } } : {}),
     Items,
   };
