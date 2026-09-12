@@ -4,7 +4,7 @@
 
 **Goal:** Turn `Gabbs27/invoice-generator` into a self-hosted issuer of Dominican electronic fiscal receipts that generates, signs and validates e-CF XML, exports 606/607, and never transmits in v1.
 
-**Architecture:** Next.js, one codebase in two modes. Locally the folder `./datos/` is the database and holds the `.p12`; on Vercel storage is in-memory and signing is disabled. The fiscal engine lives in `lib/ecf/` as pure TypeScript with no I/O, so it is testable without a browser, a certificate or a disk. Writing the signed XML with the `wx` flag is what makes a duplicate e-NCF impossible.
+**Architecture:** Next.js, one codebase in two modes. Locally the folder `./datos/` is the database and holds the `.p12`; on Vercel storage is in-memory and signing uses a demonstration certificate generated in memory. The fiscal engine lives in `lib/ecf/` as pure TypeScript with no I/O, so it is testable without a browser, a certificate or a disk. Writing the signed XML with the `wx` flag is what makes a duplicate e-NCF impossible.
 
 **Tech Stack:** Next.js 16, TypeScript, Vitest, `@react-pdf/renderer` (kept from the current app), `xmllint-wasm` for XSD validation, `node-forge` to read the `.p12`, and the XMLDSig library the Task 8 spike picks.
 
@@ -528,6 +528,12 @@ apply live in `lib/storage/secuencias.ts`.
 - Create: `lib/storage/archivos.ts`
 - Test: `lib/storage/archivos.test.ts`
 
+**Decided on 2026-09-12: no `secuencias.json`.** The next sequence is always
+read from `facturas/`; at a small business's scale that is cheap, and a cache is
+one more file that can disagree with what was issued. The file implementation
+runs the shared suite in `lib/storage/contrato.ts` plus the tests below.
+`datos/` holds real fiscal records and the `.p12`, so it goes in `.gitignore`.
+
 **Step 1: Write the tests that matter**
 
 ```ts
@@ -545,10 +551,9 @@ it('no sobrescribe el XML original cuando rechaza el duplicado', async () => {
   expect(guardado).toBe('<original/>');
 });
 
-it('deriva la próxima secuencia del directorio, no del contador', async () => {
-  await almacen.guardarComprobante('E310000000007', '<a/>');
-  rmSync(`${dir}/secuencias.json`, { force: true });   // se pierde la caché
-  expect(await almacen.proximaSecuencia('31')).toBe(8);
+it('una instancia nueva sobre la misma carpeta sigue la secuencia', async () => {
+  await new AlmacenamientoEnArchivos(dir).guardarComprobante('E310000000007', '<a/>');
+  expect(await new AlmacenamientoEnArchivos(dir).proximaSecuencia('31')).toBe(8);
 });
 
 it('se niega a emitir pasado el rango autorizado', async () => {
@@ -583,6 +588,13 @@ On Vercel (`process.env.VERCEL`) the filesystem is ephemeral, so file storage
 would appear to work and lose everything. Choose in-memory there, and make the
 demo say so on screen.
 
+**Decided on 2026-09-12: the demo signs with a demonstration certificate.** The
+XSD requires the signature, so a demo with signing disabled could never validate
+or issue anything. On Vercel the app generates, in memory and at startup, a
+self-signed certificate with no fiscal value, says so on screen, and runs the
+real flow with it; it holds nobody's fiscal identity. Locally, the credential is
+`datos/certificado.p12` and its password.
+
 **Commit:** `feat(storage): file storage locally, memory on Vercel`
 
 ---
@@ -593,6 +605,18 @@ demo say so on screen.
 
 The form, the engine call, the save. The invoice is written only after the XML
 validates — an invalid comprobante must never consume a sequence number.
+
+**Decided on 2026-09-12: v1 issues types 31 and 32 only.** Credit and debit notes
+need `InformacionReferencia` and a rule for notes issued more than 30 days later,
+which the documents leave open.
+
+The order is build, sign, validate, save: the XSD requires the signature, so
+validation cannot come first. `FechaHoraFirma` is the signing time in GMT-4,
+`dd-MM-AAAA HH:mm:ss`, and DGII checks that it is not later than the current
+time (Formato e-CF, p.58). Nothing is written before the XML validates, and the
+sequence comes from what was written, so a failed attempt consumes no number.
+When two issues race for the same number, the second gets `EEXIST` and the flow
+tries again with the next one.
 
 **Commit:** `feat(app): issue an e-CF`
 
