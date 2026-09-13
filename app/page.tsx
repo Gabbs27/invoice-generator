@@ -2,9 +2,10 @@ import type { ReactNode } from 'react';
 import { connection } from 'next/server';
 import { construirENCF } from '@/lib/ecf/encf';
 import type { TipoECF } from '@/lib/ecf/tipos';
-import { modoDeEjecucion, obtenerAlmacenamiento, type Modo } from '@/lib/storage';
+import { modoDeEjecucion, obtenerAlmacenamiento } from '@/lib/storage';
 import type { Almacenamiento } from '@/lib/storage/tipos';
 import { Emision } from './emision';
+import { Membrete } from './membrete';
 import estilos from './pagina.module.css';
 
 const EJEMPLO_DE_EMISOR = `{
@@ -38,15 +39,9 @@ export default async function Pagina() {
 
   return (
     <main className={estilos.hoja}>
-      <header className={estilos.membrete}>
-        <div>
-          <p className={estilos.antetitulo}>Comprobante fiscal electrónico</p>
-          <h1 className={estilos.titulo}>
-            Emitir <em>e-CF</em>
-          </h1>
-        </div>
-        <AvisoDeModo modo={modo} />
-      </header>
+      <Membrete actual="/" antetitulo="Comprobante fiscal electrónico" modo={modo}>
+        Emitir <em>e-CF</em>
+      </Membrete>
 
       {emisor instanceof Error ? (
         <section className={estilos.sinEmisor}>
@@ -115,28 +110,6 @@ export default async function Pagina() {
 
       <Emision modo={modo} habilitado={!(emisor instanceof Error)} />
     </main>
-  );
-}
-
-function AvisoDeModo({ modo }: { modo: Modo }) {
-  if (modo === 'demostracion') {
-    return (
-      <div className={estilos.modo}>
-        <p className={estilos.sello}>Sin valor fiscal</p>
-        <p className={estilos.notaDeModo}>
-          Demostración: el emisor y el certificado son ficticios, y lo emitido vive en memoria
-          hasta que el servidor se reinicia.
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className={estilos.modo}>
-      <p className={estilos.chip}>Modo local</p>
-      <p className={estilos.notaDeModo}>
-        Guarda en <code>datos/</code> y firma con <code>datos/certificado.p12</code>.
-      </p>
-    </div>
   );
 }
 
