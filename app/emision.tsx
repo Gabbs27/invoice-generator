@@ -9,10 +9,9 @@ import {
   type Totales,
 } from '@/lib/ecf/calculo';
 import { nombreTipo } from '@/lib/ecf/tipos';
-import type { ResultadoDeEmision } from '@/lib/emitir';
 import { conMiles } from '@/lib/formato';
 import type { Modo } from '@/lib/storage';
-import { emitir } from './acciones';
+import { emitir, type ResultadoDeLaAccion } from './acciones';
 import estilos from './emision.module.css';
 
 // Códigos y nombres del Formato e-CF v1.0: TipoIngresos (pág. 7), TipoPago (pág. 9),
@@ -85,7 +84,7 @@ export function Emision({ modo, habilitado }: { modo: Modo; habilitado: boolean 
   // Cada emisión monta un formulario nuevo, vacío: lo emitido no queda listo para mandarse
   // otra vez. Si no se emitió, lo escrito se queda para corregirlo.
   const [emisiones, setEmisiones] = useState(0);
-  const [resultado, accion, emitiendo] = useActionState<ResultadoDeEmision | null, FormData>(
+  const [resultado, accion, emitiendo] = useActionState<ResultadoDeLaAccion | null, FormData>(
     async (_anterior, datos) => {
       const nuevo = await emitir(datos);
       if (nuevo.emitido) setEmisiones((cuenta) => cuenta + 1);
@@ -578,7 +577,17 @@ function ResumenDeTotales({ totales }: { totales: Totales | null }) {
   );
 }
 
-function Resultado({ resultado, modo }: { resultado: ResultadoDeEmision | null; modo: Modo }) {
+// En la demostración el PDF llega con el resultado y se abre desde la memoria de la página: en
+// Vercel la ruta /facturas corre en otra función y no ve lo emitido. La URL dura lo que dure la
+// página abierta.
+function abrirPDF(base64: string) {
+  const bytes = Uint8Array.from(atob(base64), (caracter) => caracter.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+  window.open(url, '_blank', 'noopener');
+}
+
+function Resultado({ resultado, modo }: { resultado: ResultadoDeLaAccion | null; modo: Modo }) {
+  const pdf = resultado?.emitido === true ? resultado.pdf : undefined;
   return (
     <div aria-live="polite" className={estilos.resultado}>
       {resultado?.emitido === true && (
@@ -618,11 +627,20 @@ function Resultado({ resultado, modo }: { resultado: ResultadoDeEmision | null; 
               No se envió a DGII: esta versión no transmite.
             </li>
           </ul>
-          <p className={estilos.enlaces}>
-            <a href={`/facturas/${resultado.eNCF}`} target="_blank" rel="noreferrer">
-              Ver la representación impresa (PDF)
-            </a>
-          </p>
+          {modo === 'local' && (
+            <p className={estilos.enlaces}>
+              <a href={`/facturas/${resultado.eNCF}`} target="_blank" rel="noreferrer">
+                Ver la representación impresa (PDF)
+              </a>
+            </p>
+          )}
+          {modo === 'demostracion' && pdf !== undefined && (
+            <p className={estilos.enlaces}>
+              <button type="button" onClick={() => abrirPDF(pdf)}>
+                Ver la representación impresa (PDF)
+              </button>
+            </p>
+          )}
           <details className={estilos.xml}>
             <summary>Ver el XML firmado</summary>
             <pre>{resultado.xml}</pre>
