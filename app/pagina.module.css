@@ -237,3 +237,30 @@
     transform: rotate(-5deg) scale(1);
   }
 }
+
+.navegacion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  margin: 0 0 1.1rem;
+  font-family: var(--fuente-cifras), ui-monospace, monospace;
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.seccionDeNavegacion {
+  padding-bottom: 0.15rem;
+  border-bottom: 2px solid transparent;
+  color: var(--tinta-suave);
+  text-decoration: none;
+}
+
+.seccionDeNavegacion:hover {
+  color: var(--tinta);
+}
+
+.seccionDeNavegacion[aria-current='page'] {
+  border-bottom-color: var(--azul);
+  color: var(--azul);
+}

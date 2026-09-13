@@ -13,6 +13,7 @@ import { conMiles } from '@/lib/formato';
 import type { Modo } from '@/lib/storage';
 import { emitir, type ResultadoDeLaAccion } from './acciones';
 import estilos from './emision.module.css';
+import { Campo, Titulo } from './partes';
 
 // Códigos y nombres del Formato e-CF v1.0: TipoIngresos (pág. 7), TipoPago (pág. 9),
 // IndicadorFacturacion (pág. 37) e IndicadorBienoServicio (pág. 38).
@@ -171,7 +172,7 @@ function Formulario({
             ))}
           </fieldset>
           <div className={estilos.campos}>
-            <Campo id="tipo-ingresos" etiqueta="Tipo de ingreso" xsd="TipoIngresos">
+            <Campo id="tipo-ingresos" etiqueta="Tipo de ingreso" codigo="TipoIngresos">
               <select
                 id="tipo-ingresos"
                 name="TipoIngresos"
@@ -189,7 +190,7 @@ function Formulario({
             <Campo
               id="tipo-pago"
               etiqueta="Tipo de pago"
-              xsd="TipoPago"
+              codigo="TipoPago"
               ayuda={
                 tipoPago === '3'
                   ? 'Una factura gratuita no es válida para crédito fiscal.'
@@ -248,7 +249,7 @@ function Formulario({
             <Campo
               id="rnc-comprador"
               etiqueta="RNC o cédula"
-              xsd="RNCComprador"
+              codigo="RNCComprador"
               ayuda="9 u 11 dígitos. Los guiones se quitan al emitir."
             >
               <input
@@ -263,7 +264,7 @@ function Formulario({
                 className={`${estilos.entrada} ${estilos.cifra}`}
               />
             </Campo>
-            <Campo id="razon-social" etiqueta="Razón social" xsd="RazonSocialComprador">
+            <Campo id="razon-social" etiqueta="Razón social" codigo="RazonSocialComprador">
               <input
                 id="razon-social"
                 name="RazonSocialComprador"
@@ -462,62 +463,6 @@ function Formulario({
   );
 }
 
-function Titulo({
-  id,
-  letra,
-  nota,
-  children,
-}: {
-  id: string;
-  letra: string;
-  nota?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={estilos.titulo}>
-      <span className={estilos.letra} aria-hidden="true">
-        {letra}
-      </span>
-      <h2 id={id} className={estilos.nombre}>
-        {children}
-      </h2>
-      <span className={estilos.regla} aria-hidden="true" />
-      {nota && <p className={estilos.nota}>{nota}</p>}
-    </div>
-  );
-}
-
-function Campo({
-  id,
-  etiqueta,
-  xsd,
-  ayuda,
-  children,
-}: {
-  id: string;
-  etiqueta: string;
-  xsd: string;
-  ayuda?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={estilos.campo}>
-      <label htmlFor={id} className={estilos.etiqueta}>
-        {etiqueta}
-        <span className={estilos.xsd} aria-hidden="true">
-          {xsd}
-        </span>
-      </label>
-      {children}
-      {ayuda && (
-        <p id={`${id}-ayuda`} className={estilos.ayuda}>
-          {ayuda}
-        </p>
-      )}
-    </div>
-  );
-}
-
 // Formato e-CF, pág. 9: la venta a crédito lleva su fecha límite de pago. Si cambia el tipo
 // de pago, el campo se va con lo que tenía.
 function FechaLimiteDePago() {
@@ -526,7 +471,7 @@ function FechaLimiteDePago() {
     <Campo
       id="fecha-limite-pago"
       etiqueta="Fecha límite de pago"
-      xsd="FechaLimitePago"
+      codigo="FechaLimitePago"
       ayuda="No puede ser anterior a la fecha de emisión."
     >
       <input
