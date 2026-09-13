@@ -547,6 +547,17 @@ select.entrada {
   color: var(--azul);
 }
 
+.enlaces button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--azul);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .xml summary {
   font-weight: 700;
   color: var(--azul);
