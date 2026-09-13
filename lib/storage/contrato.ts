@@ -2,6 +2,8 @@
 // memoria.test.ts y archivos.test.ts corren estas mismas pruebas, así el
 // comportamiento de las dos no puede separarse.
 import { describe, it, expect } from 'vitest';
+import { compraDePrueba } from '../compras/ejemplos';
+import { claveDeCompra } from '../compras/tipos';
 import type { Almacenamiento, Emisor } from './tipos';
 
 export const emisorDePrueba = (hasta31 = 10): Emisor => ({
@@ -113,6 +115,83 @@ export function probarContratoDeAlmacenamiento(
       if (emisor.rangos['31']) emisor.rangos['31'].hasta = 999;
       await almacen.guardarComprobante('E310000000003', '<a/>');
       await expect(almacen.proximaSecuencia('31')).rejects.toThrow(/rango autorizado/i);
+    });
+  });
+
+  describe(`compras ${nombre}`, () => {
+    it('guarda una compra y la lista', async () => {
+      const almacen = await crear(emisorDePrueba());
+      await almacen.guardarCompra(compraDePrueba());
+      expect(await almacen.listarCompras()).toEqual([compraDePrueba()]);
+    });
+
+    it('rechaza el mismo NCF del mismo proveedor dos veces', async () => {
+      const almacen = await crear(emisorDePrueba());
+      await almacen.guardarCompra(compraDePrueba());
+      await expect(
+        almacen.guardarCompra(compraDePrueba({ MontoServicios: '5.00' }))
+      ).rejects.toThrow(/duplicad/i);
+      expect(await almacen.listarCompras()).toEqual([compraDePrueba()]);
+    });
+
+    it('guarda el mismo NCF de dos proveedores distintos', async () => {
+      const almacen = await crear(emisorDePrueba());
+      await almacen.guardarCompra(compraDePrueba());
+      await almacen.guardarCompra(compraDePrueba({ RNCCedula: '123456789' }));
+      expect(await almacen.listarCompras()).toHaveLength(2);
+    });
+
+    it('deja pasar uno solo de dos guardados simultáneos de la misma compra', async () => {
+      const almacen = await crear(emisorDePrueba());
+      const resultados = await Promise.allSettled([
+        almacen.guardarCompra(compraDePrueba()),
+        almacen.guardarCompra(compraDePrueba()),
+      ]);
+      expect(resultados.filter((resultado) => resultado.status === 'fulfilled')).toHaveLength(1);
+    });
+
+    it('reemplaza una compra sin cambiar su llave', async () => {
+      const almacen = await crear(emisorDePrueba());
+      await almacen.guardarCompra(compraDePrueba());
+      await almacen.reemplazarCompra(compraDePrueba({ MontoServicios: '2000.00' }));
+      expect(await almacen.listarCompras()).toEqual([
+        compraDePrueba({ MontoServicios: '2000.00' }),
+      ]);
+    });
+
+    it('rechaza reemplazar una compra que no está guardada', async () => {
+      const almacen = await crear(emisorDePrueba());
+      await expect(almacen.reemplazarCompra(compraDePrueba())).rejects.toThrow(/No hay una compra/);
+    });
+
+    it('borra una compra', async () => {
+      const almacen = await crear(emisorDePrueba());
+      await almacen.guardarCompra(compraDePrueba());
+      await almacen.borrarCompra(claveDeCompra(compraDePrueba()));
+      expect(await almacen.listarCompras()).toEqual([]);
+    });
+
+    it('rechaza borrar una compra que no está guardada', async () => {
+      const almacen = await crear(emisorDePrueba());
+      await expect(almacen.borrarCompra('987654321_B0100000123')).rejects.toThrow(
+        /No hay una compra/
+      );
+    });
+
+    it('rechaza una clave que no es de compra', async () => {
+      const almacen = await crear(emisorDePrueba());
+      await expect(almacen.borrarCompra('../emisor')).rejects.toThrow(/Clave de compra inválida/);
+      await expect(almacen.guardarCompra(compraDePrueba({ NCF: '../emisor' }))).rejects.toThrow(
+        /Clave de compra inválida/
+      );
+    });
+
+    it('no deja que quien lee una compra cambie la guardada', async () => {
+      const almacen = await crear(emisorDePrueba());
+      await almacen.guardarCompra(compraDePrueba());
+      const [leida] = await almacen.listarCompras();
+      leida.MontoServicios = '1.00';
+      expect(await almacen.listarCompras()).toEqual([compraDePrueba()]);
     });
   });
 }

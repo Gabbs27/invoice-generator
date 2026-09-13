@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { compraDePrueba } from '../compras/ejemplos';
 import { AlmacenamientoEnArchivos } from './archivos';
 import { emisorDePrueba, probarContratoDeAlmacenamiento } from './contrato';
 import type { Emisor } from './tipos';
@@ -91,5 +92,35 @@ describe('almacenamiento en archivos', () => {
     await expect(new AlmacenamientoEnArchivos(directorio).leerEmisor()).rejects.toThrow(
       /emisor\.json.*rangos autorizados/
     );
+  });
+});
+
+describe('compras en archivos', () => {
+  it('guarda cada compra como compras/<RNC>_<NCF>.json, con su XML al lado', async () => {
+    const directorio = carpetaDeDatos();
+    await new AlmacenamientoEnArchivos(directorio).guardarCompra(compraDePrueba(), '<ECF/>');
+    const compras = join(directorio, 'compras');
+    expect(JSON.parse(readFileSync(join(compras, '987654321_B0100000123.json'), 'utf8'))).toEqual(
+      compraDePrueba()
+    );
+    expect(readFileSync(join(compras, '987654321_B0100000123.xml'), 'utf8')).toBe('<ECF/>');
+  });
+
+  it('borra la compra y su XML', async () => {
+    const directorio = carpetaDeDatos();
+    const almacen = new AlmacenamientoEnArchivos(directorio);
+    await almacen.guardarCompra(compraDePrueba(), '<ECF/>');
+    await almacen.borrarCompra('987654321_B0100000123');
+    expect(existsSync(join(directorio, 'compras', '987654321_B0100000123.json'))).toBe(false);
+    expect(existsSync(join(directorio, 'compras', '987654321_B0100000123.xml'))).toBe(false);
+  });
+
+  it('ignora en compras/ lo que no es una compra', async () => {
+    const directorio = carpetaDeDatos();
+    mkdirSync(join(directorio, 'compras'));
+    for (const nombre of ['.DS_Store', 'notas.json', '987654321_B0100000123.json.bak']) {
+      writeFileSync(join(directorio, 'compras', nombre), '{}');
+    }
+    expect(await new AlmacenamientoEnArchivos(directorio).listarCompras()).toEqual([]);
   });
 });
