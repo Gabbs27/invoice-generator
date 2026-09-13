@@ -25,7 +25,9 @@ import {
   borrarCompra,
   generar606,
   guardarCompra,
+  importarXML,
   type ResultadoDeGuardar,
+  type ResultadoDeImportar,
   type ResultadoDel606,
 } from './acciones';
 import estilos from './compras.module.css';
@@ -91,6 +93,16 @@ export function Compras({
           <p className={estilos.aviso} aria-live="polite">
             {aviso}
           </p>
+        )}
+        {edicion.clave === undefined && (
+          <ImportarXML
+            alImportar={({ borrador, porCompletar, xml }) =>
+              abrir(
+                { inicial: borrador, porCompletar, xml },
+                'Revisa la compra, completa lo marcado y guárdala. El XML se guarda con ella.'
+              )
+            }
+          />
         )}
         <FormularioDeCompra
           key={formularios}
@@ -232,6 +244,52 @@ function AccionesDeCompra({ compra, alCorregir }: { compra: Compra; alCorregir: 
         </span>
       )}
     </>
+  );
+}
+
+function ImportarXML({
+  alImportar,
+}: {
+  alImportar: (resultado: Extract<ResultadoDeImportar, { importado: true }>) => void;
+}) {
+  const [resultado, accion, importando] = useActionState<ResultadoDeImportar | null, FormData>(
+    async (_anterior, datos) => {
+      const nuevo = await importarXML(datos);
+      if (nuevo.importado) alImportar(nuevo);
+      return nuevo;
+    },
+    null
+  );
+  return (
+    <form
+      onSubmit={(evento) => {
+        evento.preventDefault();
+        const datos = new FormData(evento.currentTarget);
+        startTransition(() => accion(datos));
+      }}
+      className={estilos.importar}
+    >
+      <label htmlFor="xml-ecf" className={emision.etiqueta}>
+        XML de un e-CF recibido (31, 33 o 34)
+      </label>
+      <input id="xml-ecf" type="file" name="xml" accept=".xml,text/xml,application/xml" required />
+      <button type="submit" disabled={importando} className={estilos.secundario}>
+        {importando ? 'Revisando…' : 'Llenar desde el XML'}
+      </button>
+      <div aria-live="polite" className={estilos.resultadoDeImportar}>
+        {resultado?.importado === false && (
+          <div className={emision.fallido}>
+            <h3>No se pudo importar</h3>
+            <ul>
+              {resultado.errores.map((error, indice) => (
+                <li key={indice}>{error}</li>
+              ))}
+            </ul>
+            <p>No se anotó nada.</p>
+          </div>
+        )}
+      </div>
+    </form>
   );
 }
 
