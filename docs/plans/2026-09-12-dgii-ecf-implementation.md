@@ -719,6 +719,15 @@ e-NCF, digital certificate, DGII certification.
 Connect the repo, deploy, confirm the demo runs in memory mode and signs with
 the demonstration certificate, and that the page says so.
 
+**Done on 2026-09-12.** The Vercel project `invoice-generator` lives in the team
+"Gabriel's projects" and is deployed with the Vercel CLI from a clean clone of
+`dgii-ecf` (committed files only, no Git integration):
+https://invoice-generator-orpin-nine.vercel.app. The first deploy showed that the
+page and `/facturas/[encf]` run as separate functions with no shared memory, so in
+demo mode every PDF link returned 404. The Server Action now returns the printed
+representation with the result (`0119bc8`). Checked in production: demo mode, an
+issued 31, and its PDF with the font embedded.
+
 ### Task 17: Update the portfolio
 
 In the **other** repo, `sanity-react`:
@@ -732,9 +741,21 @@ In the **other** repo, `sanity-react`:
 - The projects test asserts every project appears in the home page's noscript;
   run `npm test` there.
 
+**Done on 2026-09-12** (`7ef65ba` in `sanity-react`, pushed to `master` and live on
+codewithgabo.com): the Vercel URL, a new description, the current stack, and a
+screenshot of the demo encoded with `scripts/optimize-images.sh`. The build and
+its 36 tests pass. The GitHub description and homepage of `invoice-generator` now
+describe the e-CF issuer and point at Vercel.
+
 ### Task 18: Retire GitHub Pages
 
 Turn off Pages for the repo so two versions of the app do not answer at two URLs.
+
+**Done on 2026-09-12.** GitHub refused to deactivate Pages through its API (422,
+"Deactivating GitHub pages for this repository is not allowed") for this legacy
+site built from `gh-pages`. Instead, `gh-pages` now serves only an `index.html`
+and a `404.html` that forward to the Vercel URL, with `noindex` and a canonical
+link (`81bda65`). The old Create React App build stays in the branch's history.
 
 ---
 
