@@ -1506,12 +1506,20 @@ git commit -m "feat(compras): read a purchase from the form"
 This task writes no product code. It turns the open points of the design ("Lo que la norma no
 fija") into facts before Tasks 9 and 11 use them.
 
-**Decided on 2026-09-13:** Gabriel chose to go on without the tool.
-- Steps 1–4 wait until the tool is at hand.
-- The design doc records the defaults in the table below as pending confirmation, in its
-  "Pendiente de confirmar" section.
-- Tasks 9 and 11 use the defaults as written.
-- The first file the app generates should go through DGII's pre-validator.
+**Decided on 2026-09-13:** Gabriel chose to go on without the tool. Steps 1–4 wait until it is at
+hand, and Task 9 uses the defaults as written.
+
+**Settled the same day from files instead of macros:** Gabriel shared three 606 and two 607 files
+that DGII's tool generated and the Oficina Virtual accepted. Only their structure was read, and
+none of their data is in the repository. Where they differ from the table below, they win:
+- every line ends in LF, not CRLF, including the last one in the most recent files;
+- the codes in fields 3 and 23 have two digits (`09`, `03`), and field 17 follows them, since
+  NG 07-2018 gives all three N 2;
+- an amount of zero is left empty, not written as `0.00`;
+- the file name ends in `.TXT`.
+
+The design doc's "Formato del archivo" section has the details and what is still unconfirmed.
+Steps 1–4 can settle that once the tool is at hand, and so can DGII's pre-validator.
 
 **Files:**
 - Modify: `docs/plans/2026-09-13-dgii-606-design.md` (section "Datos verificados")
@@ -1928,6 +1936,11 @@ git commit -m "feat(compras): validate a purchase with the 606 rules"
 The expected bytes follow the defaults in Task 8's table. If Task 8 changed any, change them here
 first.
 
+**Changed on 2026-09-13:** Task 8 changed four defaults, so `lib/compras/archivo606.ts` and its test
+differ from the code below: the name ends in `.TXT`, every line ends in LF, the codes in fields 3,
+17 and 23 have two digits, and an amount of zero is left empty. The test adds a purchase with no
+ITBIS.
+
 **Step 1: Write the failing test**
 
 ```ts
@@ -2082,6 +2095,9 @@ git commit -m "feat(compras): write the 606 file the Oficina Virtual takes"
 **Files:**
 - Create: `app/compras/acciones.ts`
 - Test: `app/compras/acciones.test.ts`
+
+**Changed on 2026-09-13:** with Task 11's format, the demo file is
+`DGII_F_606_000000000_202609.TXT`, and the test compares its whole content, which ends in LF.
 
 **Step 1: Write the failing test**
 

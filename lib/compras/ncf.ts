@@ -1,6 +1,6 @@
 // Instructivo del 606, casilla 4: NCF de 11 posiciones (serie B) o de 13 (e-CF, Aviso 24 de abril de
-// 2019). Los tipos admitidos están pendientes de confirmar con la herramienta 606 o el
-// pre-validador de la DGII (docs/plans/2026-09-13-dgii-606-design.md, "Pendiente de confirmar").
+// 2019). B01 y E31 salen en archivos que la DGII aceptó; los demás tipos están pendientes de
+// confirmar (docs/plans/2026-09-13-dgii-606-design.md, "Formato del archivo").
 const TIPOS_B: readonly string[] = ['01', '03', '04', '11', '13', '14', '15', '16', '17'];
 const TIPOS_E: readonly string[] = ['31', '33', '34', '41', '43', '44', '45', '46', '47'];
 const NOTAS: readonly string[] = ['B03', 'B04', 'E33', 'E34'];
