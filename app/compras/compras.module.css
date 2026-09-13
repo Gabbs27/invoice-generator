@@ -100,3 +100,18 @@
   color: var(--sello);
   white-space: normal;
 }
+
+.importar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem 1.2rem;
+  margin-bottom: 1.6rem;
+  padding: 1rem 1.2rem;
+  border: 1px dashed var(--linea);
+  background: var(--papel-claro);
+}
+
+.resultadoDeImportar {
+  flex-basis: 100%;
+}
