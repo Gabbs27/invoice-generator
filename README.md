@@ -1,36 +1,112 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# invoice-generator
 
-## Getting Started
+A self-hosted issuer of Dominican electronic fiscal receipts (e-CF). It builds the
+XML for invoice types 31 (Factura de Crédito Fiscal) and 32 (Factura de Consumo),
+signs it with XMLDSig the way DGII specifies, validates it against DGII's XSD,
+saves it, and prints its representation with DGII's verification QR. The app's
+interface is in Spanish.
 
-First, run the development server:
+**Demo:** <https://invoice-generator-orpin-nine.vercel.app>. It signs with a
+throwaway certificate, has no fiscal value, and keeps what you issue in memory
+until the server restarts.
+
+## What it does not do
+
+- **It does not transmit anything to DGII.** An e-CF that DGII has not received
+  has no tax validity (DGII's e-CF FAQ, question 1.4.12), so its printed
+  representation cannot support a tax credit.
+- **Using it does not make you an emisor electrónico.** That takes DGII's
+  authorization, a digital certificate for tax processes from a provider
+  authorized by INDOTEL, and passing DGII's certification.
+
+The app says the same on its main page.
+
+## How it works
+
+The environment picks the mode:
+
+| | Local | Demo |
+|---|---|---|
+| When | `VERCEL` is not set | `VERCEL=1` |
+| Issuer | `datos/emisor.json` | fictitious, RNC of zeros |
+| Certificate | `datos/certificado.p12` | self-signed, generated at startup |
+| Storage | `datos/facturas/<e-NCF>.xml` | memory |
+
+- The order is build, sign, validate, save. Nothing is saved if the XML does not
+  validate, and a failed attempt does not use up a number.
+- The next e-NCF comes from what was already saved, not from a counter. Files are
+  written with the `wx` flag, so a duplicate fails instead of overwriting, and
+  issuing stops at the end of the authorized range.
+- `/facturas/<e-NCF>` returns the printed representation as a PDF.
+
+## Running it locally
+
+You need Node 22.12 or later (see `.nvmrc`).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm ci
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create `datos/emisor.json` with your details and the e-NCF ranges DGII authorized:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```json
+{
+  "RNCEmisor": "123456789",
+  "RazonSocialEmisor": "Tu razón social",
+  "DireccionEmisor": "Tu dirección",
+  "rangos": {
+    "31": { "desde": 1, "hasta": 100, "FechaVencimientoSecuencia": "31-12-2027" },
+    "32": { "desde": 1, "hasta": 100, "FechaVencimientoSecuencia": "31-12-2027" }
+  }
+}
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Put your certificate at `datos/certificado.p12` and its password in `.env.local`:
 
-## Learn More
+```
+CERTIFICADO_CLAVE=your-certificate-password
+```
 
-To learn more about Next.js, take a look at the following resources:
+Git ignores `datos/`, `*.p12` and `.env*`, so the certificate never leaves your
+machine. Then build and start:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm run build
+npm start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The app listens on <http://127.0.0.1:3000>, and only on your machine.
 
-## Deploy on Vercel
+## Development
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run dev        # development server on 127.0.0.1:3000
+npm test           # Vitest
+npx tsc --noEmit   # type check
+npm run lint       # ESLint
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## DGII's schemas
+
+`esquemas/` holds DGII's XSD files as DGII publishes them, with their sha256 in
+`esquemas/MANIFIESTO.json`. `esquemas/docs/` holds the DGII documents the code
+follows. DGII changes schemas without notice, so check them before each release:
+
+```bash
+node scripts/bajar-esquemas.mjs               # exits with 1 if a schema changed
+node scripts/bajar-esquemas.mjs --actualizar  # downloads them and rewrites the manifest
+```
+
+The type 31 schema uses a type it never defines. The validator adds that one
+definition in memory, and a test fails the day DGII fixes the schema.
+
+## Layout
+
+```
+lib/ecf/       the fiscal engine: e-NCF, ITBIS and totals, XML, signature, XSD validation
+lib/storage/   the storage interface, with file and in-memory implementations
+lib/           the issuing flow, form parsing and credentials
+app/           Next.js: the issuing form, its server action and the PDF route
+esquemas/      DGII's XSD files and reference documents
+docs/plans/    the design and the implementation plan
+```
