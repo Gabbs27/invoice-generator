@@ -1506,6 +1506,13 @@ git commit -m "feat(compras): read a purchase from the form"
 This task writes no product code. It turns the open points of the design ("Lo que la norma no
 fija") into facts before Tasks 9 and 11 use them.
 
+**Decided on 2026-09-13:** Gabriel chose to go on without the tool.
+- Steps 1–4 wait until the tool is at hand.
+- The design doc records the defaults in the table below as pending confirmation, in its
+  "Pendiente de confirmar" section.
+- Tasks 9 and 11 use the defaults as written.
+- The first file the app generates should go through DGII's pre-validator.
+
 **Files:**
 - Modify: `docs/plans/2026-09-13-dgii-606-design.md` (section "Datos verificados")
 - Maybe modify: this plan, the code of Tasks 9 and 11, if the tool contradicts a default
