@@ -5,6 +5,7 @@ import { archivo606, nombreDelArchivo606 } from '@/lib/compras/archivo606';
 import { importarECF, type ResultadoDeImportacion } from '@/lib/compras/desdeECF';
 import { esPeriodo } from '@/lib/compras/fechas';
 import { leerCompraDelFormulario } from '@/lib/compras/formulario';
+import { TAMANO_MAXIMO_DEL_XML } from '@/lib/compras/limites';
 import { comprasDelPeriodo } from '@/lib/compras/periodo';
 import { claveDeCompra } from '@/lib/compras/tipos';
 import { validarCompra } from '@/lib/compras/validar';
@@ -21,10 +22,15 @@ export type ResultadoDel606 =
   | { generado: true; nombre: string; contenido: string }
   | { generado: false; errores: string[] };
 
-// Un e-CF pesa unos kilobytes: un archivo de más de un megabyte no es uno.
-const TAMANO_MAXIMO_DEL_XML = 1_000_000;
-
 const mensaje = (error: unknown) => (error as Error).message;
+
+const DEMASIADO_GRANDE = 'El archivo es demasiado grande para ser un e-CF.';
+
+// El XML llega como archivo desde el formulario de importar, y como archivo o texto al guardar.
+async function textoDelXML(valor: FormDataEntryValue | null): Promise<string> {
+  if (valor === null) return '';
+  return typeof valor === 'string' ? valor : valor.text();
+}
 
 async function dependenciasDeImportacion() {
   const { RNCEmisor } = await obtenerAlmacenamiento().leerEmisor();
@@ -36,11 +42,10 @@ async function dependenciasDeImportacion() {
 
 export async function importarXML(datos: FormData): Promise<ResultadoDeImportar> {
   try {
-    const archivo = datos.get('xml');
-    const xml = archivo === null ? '' : typeof archivo === 'string' ? archivo : await archivo.text();
+    const xml = await textoDelXML(datos.get('xml'));
     if (xml === '') return { importado: false, errores: ['Elige el XML de un e-CF.'] };
     if (xml.length > TAMANO_MAXIMO_DEL_XML) {
-      return { importado: false, errores: ['El archivo es demasiado grande para ser un e-CF.'] };
+      return { importado: false, errores: [DEMASIADO_GRANDE] };
     }
     const resultado = await importarECF(xml, await dependenciasDeImportacion());
     if (!resultado.importado) return resultado;
@@ -77,8 +82,11 @@ export async function guardarCompra(datos: FormData): Promise<ResultadoDeGuardar
       }
       await almacenamiento.reemplazarCompra(compra);
     } else {
-      const xml = datos.get('xml');
-      if (typeof xml === 'string' && xml !== '') {
+      const xml = await textoDelXML(datos.get('xml'));
+      if (xml.length > TAMANO_MAXIMO_DEL_XML) {
+        return { guardado: false, errores: [DEMASIADO_GRANDE] };
+      }
+      if (xml !== '') {
         // El XML vuelve del navegador: se revisa otra vez y tiene que ser el de esta compra.
         const importacion = await importarECF(xml, await dependenciasDeImportacion());
         if (!importacion.importado) return { guardado: false, errores: importacion.errores };
