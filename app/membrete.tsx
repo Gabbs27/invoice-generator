@@ -48,8 +48,8 @@ function AvisoDeModo({ modo }: { modo: Modo }) {
       <div className={estilos.modo}>
         <p className={estilos.sello}>Sin valor fiscal</p>
         <p className={estilos.notaDeModo}>
-          Demostración: el emisor y el certificado son ficticios, y lo emitido vive en memoria
-          hasta que el servidor se reinicia.
+          Demostración: el emisor y el certificado son ficticios, y lo que se emite o se anota vive
+          en memoria, a la vista de quien entre, hasta que el servidor se reinicia.
         </p>
       </div>
     );

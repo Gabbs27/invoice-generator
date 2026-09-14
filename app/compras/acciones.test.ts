@@ -1,8 +1,10 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { compraDePrueba } from '@/lib/compras/ejemplos';
+import type { FormaPago } from '@/lib/compras/tipos';
 import { crearCredencialDeDemostracion } from '@/lib/credencial';
 import { emitirECF } from '@/lib/emitir';
 import { leerEsquema } from '@/lib/esquemas';
-import { CLAVE_DEL_PROCESO, EMISOR_DE_DEMOSTRACION } from '@/lib/storage';
+import { CLAVE_DEL_PROCESO, EMISOR_DE_DEMOSTRACION, obtenerAlmacenamiento } from '@/lib/storage';
 import { emisorDePrueba } from '@/lib/storage/contrato';
 import { AlmacenamientoEnMemoria } from '@/lib/storage/memoria';
 import { borrarCompra, generar606, guardarCompra, importarXML } from './acciones';
@@ -97,6 +99,24 @@ describe('acciones de compras', () => {
     expect(await guardarCompra(formulario({ ...anotada, NCF: 'B1300000001' }))).toEqual({
       guardado: false,
       errores: [expect.stringMatching(/gastos menores/)],
+    });
+  });
+
+  // Una compra editada a mano en datos/ no pasó por guardarCompra.
+  it('no genera el 606 si una compra guardada tiene errores', async () => {
+    vi.stubEnv('VERCEL', '1');
+    await obtenerAlmacenamiento().guardarCompra(compraDePrueba({ FormaPago: '8' as FormaPago }));
+    expect(await generar606('202609')).toEqual({
+      generado: false,
+      errores: [expect.stringMatching(/B0100000123 de 987654321: Forma de pago inválida/)],
+    });
+  });
+
+  it('no guarda un XML más grande de lo que pesa un e-CF', async () => {
+    vi.stubEnv('VERCEL', '1');
+    expect(await guardarCompra(formulario({ ...anotada, xml: 'x'.repeat(1_000_001) }))).toEqual({
+      guardado: false,
+      errores: [expect.stringMatching(/demasiado grande/)],
     });
   });
 

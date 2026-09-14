@@ -10,6 +10,7 @@ import {
   periodoAnterior,
   periodoSiguiente,
 } from '@/lib/compras/fechas';
+import { TAMANO_MAXIMO_DEL_XML } from '@/lib/compras/limites';
 import { aCentavos, aMonto } from '@/lib/compras/montos';
 import {
   claveDeCompra,
@@ -44,6 +45,11 @@ function montoLegible(...valores: string[]): string {
     return valores.join(' + ');
   }
 }
+
+// Si la llamada al servidor falla (sin conexión, o una respuesta que no llega), la página lo dice
+// en vez de caerse.
+const SIN_RESPUESTA =
+  'No se pudo hablar con el servidor. Revisa la conexión y vuelve a intentarlo.';
 
 // Lo que el formulario muestra: una compra nueva, una por corregir o una importada de un XML.
 interface Edicion {
@@ -125,6 +131,10 @@ export function Compras({
               alCorregir={() => {
                 const clave = claveDeCompra(compra);
                 abrir({ clave, inicial: completas[clave] ?? compra }, null);
+              }}
+              alBorrar={() => {
+                // Si era la que se estaba corrigiendo, el formulario vuelve a quedar vacío.
+                if (edicion.clave === claveDeCompra(compra)) abrir({ inicial: {} }, null);
               }}
             />
           )}
@@ -218,24 +228,38 @@ export function Lista({
   );
 }
 
-function AccionesDeCompra({ compra, alCorregir }: { compra: Compra; alCorregir: () => void }) {
+function AccionesDeCompra({
+  compra,
+  alCorregir,
+  alBorrar,
+}: {
+  compra: Compra;
+  alCorregir: () => void;
+  alBorrar: () => void;
+}) {
   const [borrando, setBorrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const cual = `${compra.NCF} de ${compra.RNCCedula}`;
   const borrar = async () => {
-    if (!window.confirm(`¿Borrar ${compra.NCF} de ${compra.RNCCedula}? No se puede deshacer.`)) {
-      return;
-    }
+    if (!window.confirm(`¿Borrar ${cual}? No se puede deshacer.`)) return;
     setBorrando(true);
-    const resultado = await borrarCompra(claveDeCompra(compra));
-    setBorrando(false);
-    if (!resultado.borrado) setError(resultado.errores.join(' '));
+    setError(null);
+    try {
+      const resultado = await borrarCompra(claveDeCompra(compra));
+      if (resultado.borrado) alBorrar();
+      else setError(resultado.errores.join(' '));
+    } catch {
+      setError(SIN_RESPUESTA);
+    } finally {
+      setBorrando(false);
+    }
   };
   return (
     <>
-      <button type="button" onClick={alCorregir}>
+      <button type="button" onClick={alCorregir} aria-label={`Corregir ${cual}`}>
         Corregir
       </button>
-      <button type="button" onClick={borrar} disabled={borrando}>
+      <button type="button" onClick={borrar} disabled={borrando} aria-label={`Borrar ${cual}`}>
         {borrando ? 'Borrando…' : 'Borrar'}
       </button>
       {error && (
@@ -254,9 +278,18 @@ function ImportarXML({
 }) {
   const [resultado, accion, importando] = useActionState<ResultadoDeImportar | null, FormData>(
     async (_anterior, datos) => {
-      const nuevo = await importarXML(datos);
-      if (nuevo.importado) alImportar(nuevo);
-      return nuevo;
+      // Un archivo de más no llega a la acción: Next la rechaza antes, sin decir por qué.
+      const archivo = datos.get('xml');
+      if (archivo instanceof File && archivo.size > TAMANO_MAXIMO_DEL_XML) {
+        return { importado: false, errores: ['El archivo es demasiado grande para ser un e-CF.'] };
+      }
+      try {
+        const nuevo = await importarXML(datos);
+        if (nuevo.importado) alImportar(nuevo);
+        return nuevo;
+      } catch {
+        return { importado: false, errores: [SIN_RESPUESTA] };
+      }
     },
     null
   );
@@ -337,9 +370,13 @@ function FormularioDeCompra({
   };
   const [resultado, accion, guardando] = useActionState<ResultadoDeGuardar | null, FormData>(
     async (_anterior, datos) => {
-      const nuevo = await guardarCompra(datos);
-      if (nuevo.guardado) alGuardar(nuevo.clave);
-      return nuevo;
+      try {
+        const nuevo = await guardarCompra(datos);
+        if (nuevo.guardado) alGuardar(nuevo.clave);
+        return nuevo;
+      } catch {
+        return { guardado: false, errores: [SIN_RESPUESTA] };
+      }
     },
     null
   );
@@ -361,13 +398,16 @@ function FormularioDeCompra({
         // El aviso de la compra anterior no se queda junto al resultado de este envío.
         alEnviar();
         const datos = new FormData(evento.currentTarget);
+        // Como archivo y no como campo de texto, para que el XML no cambie sus saltos de línea.
+        if (xml !== undefined) {
+          datos.set('xml', new Blob([xml], { type: 'application/xml' }), 'compra.xml');
+        }
         startTransition(() => accion(datos));
       }}
       className={emision.formulario}
     >
       <fieldset disabled={guardando} className={emision.contenido}>
         {clave && <input type="hidden" name="claveOriginal" value={clave} />}
-        {xml && <input type="hidden" name="xml" value={xml} />}
         <div className={emision.campos}>
           <Campo
             id="rnc-proveedor"
@@ -638,9 +678,13 @@ function bajar(nombre: string, contenido: string) {
 function Bajar606({ periodo, hayCompras }: { periodo: string; hayCompras: boolean }) {
   const [resultado, accion, generando] = useActionState<ResultadoDel606 | null, void>(
     async () => {
-      const nuevo = await generar606(periodo);
-      if (nuevo.generado) bajar(nuevo.nombre, nuevo.contenido);
-      return nuevo;
+      try {
+        const nuevo = await generar606(periodo);
+        if (nuevo.generado) bajar(nuevo.nombre, nuevo.contenido);
+        return nuevo;
+      } catch {
+        return { generado: false, errores: [SIN_RESPUESTA] };
+      }
     },
     null
   );
