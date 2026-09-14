@@ -27,7 +27,8 @@ que no sabe cómo resolver. No es una hipótesis de mercado: es una fecha.
 ## Qué es y qué no es
 
 **Es** un emisor self-hosted: un negocio corre su propia instancia, con su RNC,
-sus rangos de secuencia y su certificado digital, y emite sus comprobantes.
+sus rangos de secuencia y su certificado digital, y emite sus comprobantes: en la
+v1, facturas de crédito fiscal (31) y de consumo (32).
 
 **No es**, en la v1:
 
@@ -50,7 +51,7 @@ Next.js, porque un solo código cubre los dos usos que el proyecto tiene:
 |---|---|---|
 | Cómo corre | `npm start` en la máquina del negocio | despliegue público |
 | Almacenamiento | carpeta `./datos/` | memoria, se pierde al salir |
-| Certificado | el `.p12` dentro de esa carpeta | ninguno; la firma queda deshabilitada |
+| Certificado | el `.p12` dentro de esa carpeta | uno de demostración, generado en memoria y sin valor fiscal |
 | Para qué sirve | emitir de verdad | enseñarlo y probarlo |
 
 El `.p12` nunca sale de la máquina del negocio. Eso no es una limitación del
@@ -58,12 +59,15 @@ modelo self-hosted, es su mejor argumento: nadie custodia la identidad fiscal de
 nadie. Un `.p12` ajeno firma comprobantes a nombre de otro ante DGII; guardar
 veinte es custodiar veinte identidades fiscales.
 
+La demo firma con un certificado de demostración porque el XSD exige la firma: sin
+ella nada valida y la demo no podría emitir. Ese certificado no es de nadie, y la
+demo lo dice en pantalla.
+
 ### La carpeta es la base de datos
 
 ```
 datos/
   emisor.json              RNC, razón social, rangos e-NCF autorizados
-  secuencias.json          próximo número por tipo de comprobante
   certificado.p12          solo en local, fuera de git
   facturas/
     E310000000001.xml      el XML firmado, tal como se emitió
@@ -89,9 +93,9 @@ un índice único en Postgres, sin Postgres, y con la propiedad que importa: un
 duplicado **explota** en vez de pasar callado.
 
 El número siguiente se deriva leyendo el directorio, no de un contador en el que
-haya que confiar. `secuencias.json` es una caché; si se pierde o se corrompe, se
-reconstruye desde los archivos. La fuente de verdad es lo que se emitió, no lo
-que un contador dice que se emitió.
+haya que confiar, y tampoco hay caché: sería un archivo más capaz de contradecir lo
+emitido. La fuente de verdad es lo que se emitió, no lo que un contador dice que
+se emitió.
 
 Emitir se rechaza al alcanzar el tope del rango autorizado en `emisor.json`.
 
@@ -101,9 +105,9 @@ Emitir se rechaza al alcanzar el tope del rango autorizado en `emisor.json`.
 lib/ecf/          TypeScript puro, sin framework, sin I/O
   tipos.ts        los 10 tipos de comprobante
   encf.ts         formato y validación del e-NCF
-  calculo.ts      ITBIS, retenciones, totales
+  calculo.ts      ITBIS y totales
   xml.ts          construcción del XML
-  firma.ts        XAdES-BES con .p12
+  firma.ts        XMLDSig con .p12, como lo define DGII
   validar.ts      contra el XSD de DGII
   reportes.ts     606 / 607
 lib/storage/      la interfaz y sus dos implementaciones
@@ -136,7 +140,9 @@ Todo lo siguiente sale de documentación de DGII o de su portal:
 - **Tipos:** 31 Factura de Crédito Fiscal, 32 Factura de Consumo, 33 Nota de
   Débito, 34 Nota de Crédito, 41 Compras, 43 Gastos Menores, 44 Regímenes
   Especiales, 45 Gubernamental, 46 Exportaciones, 47 Pagos al Exterior.
-- **Firma:** XAdES-BES sobre XML, con certificado `.p12`.
+- **Firma:** XMLDSig *enveloped* sobre todo el documento, RSA-SHA256, con
+  certificado `.p12`, según *Firmado de e-CF* (`esquemas/docs/`). Este documento
+  decía XAdES-BES; no lo es.
 - **Otros documentos del flujo:** RFCE (resumen de factura de consumo), ACECF
   (aprobación comercial), ARECF (acuse de recibo).
 - **Certificación como emisor:** exige Alta NCF, certificado digital de una
@@ -157,12 +163,20 @@ Los de los tipos 33 y 34 se modificaron el 1 de abril de 2026, seis meses despu�
 del resto. El script, sin `--actualizar`, sale con código 1 si algún esquema
 cambió desde el manifiesto, y se corre antes de cada release.
 
+**Y DGII publica esquemas que no compilan.** El de la factura de crédito fiscal
+(31) usa `IndicadorServicioTodoIncluidoType` y no lo define; los de los tipos 33,
+34, 44 y 45 sí. El archivo se commitea tal cual lo publica DGII, el validador le
+agrega en memoria esa única definición, y una prueba se pone roja el día que DGII
+lo corrija.
+
 ## Cómo se verifica
 
-- El XML valida contra el XSD commiteado, o el test se pone rojo.
-- Secuencia: emisión concurrente, agotamiento del rango, `secuencias.json`
-  borrado, e-NCF duplicado. Los cuatro casos tienen prueba.
+- El XML valida contra el XSD commiteado, o el test se pone rojo. En el tipo 31,
+  con la definición que a su esquema le falta.
+- Secuencia: emisión concurrente, agotamiento del rango, una instancia nueva
+  sobre la misma carpeta, e-NCF duplicado. Los cuatro casos tienen prueba.
 - ITBIS y totales contra casos conocidos, incluidos los de tasa reducida.
-- RNC de 9 dígitos y cédula de 11, con dígito verificador.
+- RNC de 9 dígitos y cédula de 11. Sin dígito verificador: ningún documento de
+  DGII lo define.
 - Cada guard se comprueba en los dos sentidos: rojo sobre el estado roto, verde
   sobre el arreglado, en la misma sesión.

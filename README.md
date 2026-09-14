@@ -1,70 +1,112 @@
-# Getting Started with Create React App
+# invoice-generator
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A self-hosted issuer of Dominican electronic fiscal receipts (e-CF). It builds the
+XML for invoice types 31 (Factura de Crédito Fiscal) and 32 (Factura de Consumo),
+signs it with XMLDSig the way DGII specifies, validates it against DGII's XSD,
+saves it, and prints its representation with DGII's verification QR. The app's
+interface is in Spanish.
 
-## Available Scripts
+**Demo:** <https://invoice-generator-orpin-nine.vercel.app>. It signs with a
+throwaway certificate, has no fiscal value, and keeps what you issue in memory
+until the server restarts.
 
-In the project directory, you can run:
+## What it does not do
 
-### `npm start`
+- **It does not transmit anything to DGII.** An e-CF that DGII has not received
+  has no tax validity (DGII's e-CF FAQ, question 1.4.12), so its printed
+  representation cannot support a tax credit.
+- **Using it does not make you an emisor electrónico.** That takes DGII's
+  authorization, a digital certificate for tax processes from a provider
+  authorized by INDOTEL, and passing DGII's certification.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+The app says the same on its main page.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## How it works
 
-### `npm test`
+The environment picks the mode:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+| | Local | Demo |
+|---|---|---|
+| When | `VERCEL` is not set | `VERCEL=1` |
+| Issuer | `datos/emisor.json` | fictitious, RNC of zeros |
+| Certificate | `datos/certificado.p12` | self-signed, generated at startup |
+| Storage | `datos/facturas/<e-NCF>.xml` | memory |
 
-### `npm run build`
+- The order is build, sign, validate, save. Nothing is saved if the XML does not
+  validate, and a failed attempt does not use up a number.
+- The next e-NCF comes from what was already saved, not from a counter. Files are
+  written with the `wx` flag, so a duplicate fails instead of overwriting, and
+  issuing stops at the end of the authorized range.
+- `/facturas/<e-NCF>` returns the printed representation as a PDF.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Running it locally
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+You need Node 22.12 or later (see `.nvmrc`).
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```bash
+npm ci
+```
 
-### `npm run eject`
+Create `datos/emisor.json` with your details and the e-NCF ranges DGII authorized:
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+```json
+{
+  "RNCEmisor": "123456789",
+  "RazonSocialEmisor": "Tu razón social",
+  "DireccionEmisor": "Tu dirección",
+  "rangos": {
+    "31": { "desde": 1, "hasta": 100, "FechaVencimientoSecuencia": "31-12-2027" },
+    "32": { "desde": 1, "hasta": 100, "FechaVencimientoSecuencia": "31-12-2027" }
+  }
+}
+```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Put your certificate at `datos/certificado.p12` and its password in `.env.local`:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+```
+CERTIFICADO_CLAVE=your-certificate-password
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Git ignores `datos/`, `*.p12` and `.env*`, so the certificate never leaves your
+machine. Then build and start:
 
-## Learn More
+```bash
+npm run build
+npm start
+```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+The app listens on <http://127.0.0.1:3000>, and only on your machine.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Development
 
-### Code Splitting
+```bash
+npm run dev        # development server on 127.0.0.1:3000
+npm test           # Vitest
+npx tsc --noEmit   # type check
+npm run lint       # ESLint
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## DGII's schemas
 
-### Analyzing the Bundle Size
+`esquemas/` holds DGII's XSD files as DGII publishes them, with their sha256 in
+`esquemas/MANIFIESTO.json`. `esquemas/docs/` holds the DGII documents the code
+follows. DGII changes schemas without notice, so check them before each release:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+```bash
+node scripts/bajar-esquemas.mjs               # exits with 1 if a schema changed
+node scripts/bajar-esquemas.mjs --actualizar  # downloads them and rewrites the manifest
+```
 
-### Making a Progressive Web App
+The type 31 schema uses a type it never defines. The validator adds that one
+definition in memory, and a test fails the day DGII fixes the schema.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## Layout
 
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+```
+lib/ecf/       the fiscal engine: e-NCF, ITBIS and totals, XML, signature, XSD validation
+lib/storage/   the storage interface, with file and in-memory implementations
+lib/           the issuing flow, form parsing and credentials
+app/           Next.js: the issuing form, its server action and the PDF route
+esquemas/      DGII's XSD files and reference documents
+docs/plans/    the design and the implementation plan
+```
