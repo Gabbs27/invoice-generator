@@ -1521,6 +1521,12 @@ none of their data is in the repository. Where they differ from the table below,
 The design doc's "Formato del archivo" section has the details and what is still unconfirmed.
 Steps 1–4 can settle that once the tool is at hand, and so can DGII's pre-validator.
 
+**Steps 1–4, run later that day:** with Gabriel's permission, on a 2023 copy of the tool. Only its
+VBA was read. Its macros changed three things: no newline after the last line, the ITBIS por
+adelantar always written, and the NCF types of the tool's regex (B12 in, B16 and E46 out). They also
+added a check: a gastos menores NCF carries the business's own RNC. The design's "Formato del
+archivo" has the details.
+
 **Files:**
 - Modify: `docs/plans/2026-09-13-dgii-606-design.md` (section "Datos verificados")
 - Maybe modify: this plan, the code of Tasks 9 and 11, if the tool contradicts a default
