@@ -1,5 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { compraDePrueba } from '../compras/ejemplos';
@@ -122,5 +130,38 @@ describe('compras en archivos', () => {
       writeFileSync(join(directorio, 'compras', nombre), '{}');
     }
     expect(await new AlmacenamientoEnArchivos(directorio).listarCompras()).toEqual([]);
+  });
+
+  it('no deja la compra sin su XML si el XML no se puede escribir', async () => {
+    const directorio = carpetaDeDatos();
+    // Una carpeta con el nombre del XML hace fallar la escritura.
+    mkdirSync(join(directorio, 'compras', '987654321_B0100000123.xml'), { recursive: true });
+    const almacen = new AlmacenamientoEnArchivos(directorio);
+    await expect(almacen.guardarCompra(compraDePrueba(), '<ECF/>')).rejects.toThrow();
+    expect(existsSync(join(directorio, 'compras', '987654321_B0100000123.json'))).toBe(false);
+    expect(await almacen.listarCompras()).toEqual([]);
+  });
+
+  it('corregir una compra deja su XML y ningún archivo de más', async () => {
+    const directorio = carpetaDeDatos();
+    const almacen = new AlmacenamientoEnArchivos(directorio);
+    await almacen.guardarCompra(compraDePrueba(), '<ECF/>');
+    await almacen.reemplazarCompra(compraDePrueba({ MontoServicios: '2000.00' }));
+    const compras = join(directorio, 'compras');
+    expect(readFileSync(join(compras, '987654321_B0100000123.xml'), 'utf8')).toBe('<ECF/>');
+    expect(readdirSync(compras).sort()).toEqual([
+      '987654321_B0100000123.json',
+      '987654321_B0100000123.xml',
+    ]);
+    expect(await almacen.listarCompras()).toEqual([compraDePrueba({ MontoServicios: '2000.00' })]);
+  });
+
+  it('dice qué archivo de compra está roto', async () => {
+    const directorio = carpetaDeDatos();
+    mkdirSync(join(directorio, 'compras'));
+    writeFileSync(join(directorio, 'compras', '987654321_B0100000123.json'), '{');
+    await expect(new AlmacenamientoEnArchivos(directorio).listarCompras()).rejects.toThrow(
+      /987654321_B0100000123\.json/
+    );
   });
 });

@@ -1,4 +1,4 @@
-import { access, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { claveDeCompra, esClaveDeCompra, exigirClaveDeCompra, type Compra } from '../compras/tipos';
 import { esENCFValido, parsearENCF } from '../ecf/encf';
@@ -123,7 +123,10 @@ export class AlmacenamientoEnArchivos implements Almacenamiento {
       if (codigo(error) === 'ENOENT') throw new Error(`No hay una compra ${clave}.`, { cause: error });
       throw error;
     }
-    await writeFile(ruta, `${JSON.stringify(compra, null, 2)}\n`);
+    // Se escribe aparte y se renombra: si algo corta la escritura, la compra anterior queda entera.
+    const temporal = `${ruta}.tmp`;
+    await writeFile(temporal, `${JSON.stringify(compra, null, 2)}\n`);
+    await rename(temporal, ruta);
   }
 
   async borrarCompra(clave: string): Promise<void> {
@@ -150,10 +153,14 @@ export class AlmacenamientoEnArchivos implements Almacenamiento {
       .map((nombre) => nombre.slice(0, -5))
       .sort();
     return Promise.all(
-      claves.map(
-        async (clave) =>
-          JSON.parse(await readFile(join(this.compras, `${clave}.json`), 'utf8')) as Compra
-      )
+      claves.map(async (clave) => {
+        const ruta = join(this.compras, `${clave}.json`);
+        try {
+          return JSON.parse(await readFile(ruta, 'utf8')) as Compra;
+        } catch (error) {
+          throw new Error(`No se pudo leer ${ruta}: ${(error as Error).message}`, { cause: error });
+        }
+      })
     );
   }
 }
