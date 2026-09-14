@@ -5,7 +5,7 @@ import { archivo606, nombreDelArchivo606 } from '@/lib/compras/archivo606';
 import { importarECF, type ResultadoDeImportacion } from '@/lib/compras/desdeECF';
 import { esPeriodo } from '@/lib/compras/fechas';
 import { leerCompraDelFormulario } from '@/lib/compras/formulario';
-import { TAMANO_MAXIMO_DEL_XML } from '@/lib/compras/limites';
+import { DEMASIADO_GRANDE, TAMANO_MAXIMO_DEL_XML } from '@/lib/compras/limites';
 import { comprasDelPeriodo } from '@/lib/compras/periodo';
 import { claveDeCompra } from '@/lib/compras/tipos';
 import { validarCompra } from '@/lib/compras/validar';
@@ -23,8 +23,6 @@ export type ResultadoDel606 =
   | { generado: false; errores: string[] };
 
 const mensaje = (error: unknown) => (error as Error).message;
-
-const DEMASIADO_GRANDE = 'El archivo es demasiado grande para ser un e-CF.';
 
 // El XML llega como archivo desde el formulario de importar, y como archivo o texto al guardar.
 async function textoDelXML(valor: FormDataEntryValue | null): Promise<string> {
