@@ -1,0 +1,117 @@
+.compras {
+  display: grid;
+  gap: clamp(2.2rem, 5vw, 3.5rem);
+  margin-top: clamp(1.8rem, 4vw, 3rem);
+}
+
+.periodo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem 1.5rem;
+  font-family: var(--fuente-cifras), ui-monospace, monospace;
+  font-size: 0.82rem;
+}
+
+.periodo a {
+  color: var(--azul);
+}
+
+.mes {
+  margin: 0;
+  font-family: var(--fuente-titulares), Georgia, serif;
+  font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+}
+
+.mes::first-letter {
+  text-transform: uppercase;
+}
+
+.reenvio {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--fuente-texto), system-ui, sans-serif;
+  font-size: 0.75rem;
+  color: var(--tinta-suave);
+}
+
+.acciones {
+  white-space: nowrap;
+}
+
+.acciones button {
+  margin-left: 0.7rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--azul);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.acciones button:disabled {
+  color: var(--tinta-tenue);
+  cursor: not-allowed;
+}
+
+.aviso {
+  margin: 0 0 1rem;
+  padding: 0.7rem 1rem;
+  border-left: 4px solid var(--verde);
+  background: rgb(46 107 61 / 0.07);
+}
+
+.masCampos {
+  margin-top: 1.4rem;
+}
+
+.masCampos summary {
+  margin-bottom: 1rem;
+  color: var(--azul);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.botones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.6rem 0 1rem;
+}
+
+.secundario {
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--linea);
+  border-radius: 3px;
+  background: var(--papel-claro);
+  color: var(--tinta);
+  font: inherit;
+  cursor: pointer;
+}
+
+.error {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.8rem;
+  color: var(--sello);
+  white-space: normal;
+}
+
+.importar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem 1.2rem;
+  margin-bottom: 1.6rem;
+  padding: 1rem 1.2rem;
+  border: 1px dashed var(--linea);
+  background: var(--papel-claro);
+}
+
+.resultadoDeImportar {
+  flex-basis: 100%;
+}

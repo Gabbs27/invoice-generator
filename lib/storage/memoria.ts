@@ -1,3 +1,4 @@
+import { claveDeCompra, exigirClaveDeCompra, type Compra } from '../compras/tipos';
 import { parsearENCF } from '../ecf/encf';
 import type { TipoECF } from '../ecf/tipos';
 import { comprobarQueSePuedeGuardar, siguienteSecuencia } from './secuencias';
@@ -7,6 +8,7 @@ import type { Almacenamiento, Emisor } from './tipos';
 export class AlmacenamientoEnMemoria implements Almacenamiento {
   private readonly emisor: Emisor;
   private readonly comprobantes = new Map<string, string>();
+  private readonly compras = new Map<string, { compra: Compra; xml?: string }>();
 
   constructor(emisor: Emisor) {
     this.emisor = structuredClone(emisor);
@@ -38,5 +40,32 @@ export class AlmacenamientoEnMemoria implements Almacenamiento {
     return [...this.comprobantes.keys()]
       .filter((encf) => tipo === undefined || parsearENCF(encf).tipo === tipo)
       .sort();
+  }
+
+  async guardarCompra(compra: Compra, xml?: string): Promise<void> {
+    const clave = exigirClaveDeCompra(claveDeCompra(compra));
+    // Comprobar y escribir en el mismo tick, como con los comprobantes.
+    if (this.compras.has(clave)) {
+      throw new Error(`Compra duplicada: ${compra.NCF} de ${compra.RNCCedula} ya está anotada.`);
+    }
+    this.compras.set(clave, { compra: structuredClone(compra), xml });
+  }
+
+  async reemplazarCompra(compra: Compra): Promise<void> {
+    const clave = exigirClaveDeCompra(claveDeCompra(compra));
+    const guardada = this.compras.get(clave);
+    if (guardada === undefined) throw new Error(`No hay una compra ${clave}.`);
+    this.compras.set(clave, { ...guardada, compra: structuredClone(compra) });
+  }
+
+  async borrarCompra(clave: string): Promise<void> {
+    exigirClaveDeCompra(clave);
+    if (!this.compras.delete(clave)) throw new Error(`No hay una compra ${clave}.`);
+  }
+
+  async listarCompras(): Promise<Compra[]> {
+    return [...this.compras.entries()]
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([, { compra }]) => structuredClone(compra));
   }
 }

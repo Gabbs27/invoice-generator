@@ -700,7 +700,16 @@ output is a CSV with the instructivo's 23 fields, to paste into DGII's tool,
 which generates and validates the TXT. The form then gains the payment method,
 because contado does not say how a sale was paid.
 
-**Commit:** `feat(app): 606 and 607 reports`
+**Decided on 2026-09-13:** DGII answers it, and the 607 is dropped.
+- An emisor electrónico does not file its e-CF in the 607: e-CF FAQ 1.4.13, and
+  DGII's official answer of June 2025. The 607's NCF field takes 11 characters.
+- Series B ends for pequeños, micro and no clasificados on 15 November 2026
+  (Aviso 06-26), so issuing B01 and B02 only to feed a 607 would serve a few weeks.
+- The 606 stays, because every taxpayer with purchases files it, and it carries the
+  e-CF received as well. It moves to its own branch and PR, `dgii-606`, designed in
+  `docs/plans/2026-09-13-dgii-606-design.md`.
+
+**Commit:** none in this plan; the 606 has its own.
 
 ### Task 15: Say plainly what this is not
 
