@@ -1943,9 +1943,9 @@ The expected bytes follow the defaults in Task 8's table. If Task 8 changed any,
 first.
 
 **Changed on 2026-09-13:** Task 8 changed four defaults, so `lib/compras/archivo606.ts` and its test
-differ from the code below: the name ends in `.TXT`, every line ends in LF, the codes in fields 3,
-17 and 23 have two digits, and an amount of zero is left empty. The test adds a purchase with no
-ITBIS.
+differ from the code below: the name ends in `.TXT`, lines are separated by LF with no newline after
+the last, the codes in fields 3, 17 and 23 have two digits, and an amount of zero is left empty,
+except the computed total and ITBIS por adelantar. The test adds a purchase with no ITBIS.
 
 **Step 1: Write the failing test**
 
@@ -2103,7 +2103,8 @@ git commit -m "feat(compras): write the 606 file the Oficina Virtual takes"
 - Test: `app/compras/acciones.test.ts`
 
 **Changed on 2026-09-13:** with Task 11's format, the demo file is
-`DGII_F_606_000000000_202609.TXT`, and the test compares its whole content, which ends in LF.
+`DGII_F_606_000000000_202609.TXT`, and the test compares its whole content, with no newline at the
+end.
 
 **Step 1: Write the failing test**
 
