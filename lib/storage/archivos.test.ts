@@ -156,6 +156,35 @@ describe('compras en archivos', () => {
     expect(await almacen.listarCompras()).toEqual([compraDePrueba({ MontoServicios: '2000.00' })]);
   });
 
+  // Dos pestañas corrigiendo la misma compra: cada una escribe su propio temporal y gana la última.
+  it('aguanta dos correcciones a la vez de la misma compra', async () => {
+    const directorio = carpetaDeDatos();
+    const almacen = new AlmacenamientoEnArchivos(directorio);
+    await almacen.guardarCompra(compraDePrueba());
+    const corta = compraDePrueba({ MontoServicios: '2000.00' });
+    const larga = compraDePrueba({
+      MontoServicios: '30000.00',
+      ITBISRetenido: '10.00',
+      FechaPago: '20260920',
+    });
+    for (let vuelta = 0; vuelta < 20; vuelta++) {
+      await Promise.all([almacen.reemplazarCompra(corta), almacen.reemplazarCompra(larga)]);
+      const [guardada] = await almacen.listarCompras();
+      expect([corta, larga]).toContainEqual(guardada);
+    }
+    expect(readdirSync(join(directorio, 'compras'))).toEqual(['987654321_B0100000123.json']);
+  });
+
+  it('dice qué archivo de compra está incompleto', async () => {
+    const directorio = carpetaDeDatos();
+    mkdirSync(join(directorio, 'compras'));
+    const sinFecha = JSON.stringify({ ...compraDePrueba(), FechaComprobante: undefined });
+    writeFileSync(join(directorio, 'compras', '987654321_B0100000123.json'), sinFecha);
+    await expect(new AlmacenamientoEnArchivos(directorio).listarCompras()).rejects.toThrow(
+      /987654321_B0100000123\.json.*FechaComprobante/
+    );
+  });
+
   it('dice qué archivo de compra está roto', async () => {
     const directorio = carpetaDeDatos();
     mkdirSync(join(directorio, 'compras'));
