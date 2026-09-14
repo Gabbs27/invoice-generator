@@ -1,9 +1,11 @@
 // Instructivo del 606, casilla 4: NCF de 11 posiciones (serie B) o de 13 (e-CF, Aviso 24 de abril de
-// 2019). B01 y E31 salen en archivos que la DGII aceptó; los demás tipos están pendientes de
-// confirmar (docs/plans/2026-09-13-dgii-606-design.md, "Formato del archivo").
-const TIPOS_B: readonly string[] = ['01', '03', '04', '11', '13', '14', '15', '16', '17'];
-const TIPOS_E: readonly string[] = ['31', '33', '34', '41', '43', '44', '45', '46', '47'];
+// 2019). Los tipos son los que acepta la expresión regular de la herramienta 606 de la DGII
+// (strRegexNcf), menos las facturas de consumo y E42, que no es un tipo de e-CF.
+const TIPOS_B: readonly string[] = ['01', '03', '04', '11', '12', '13', '14', '15', '17'];
+const TIPOS_E: readonly string[] = ['31', '33', '34', '41', '43', '44', '45', '47'];
 const NOTAS: readonly string[] = ['B03', 'B04', 'E33', 'E34'];
+// El comprobante de gastos menores lo emite quien compra.
+const GASTOS_MENORES: readonly string[] = ['B13', 'E43'];
 // NG 06-2018: la factura de consumo es la que se emite para el consumidor final; la de crédito
 // fiscal, la que tiene valor fiscal.
 const CONSUMO: readonly string[] = ['B02', 'E32'];
@@ -30,3 +32,5 @@ export function leerNCFDeCompra(ncf: string): LecturaDeNCF {
   }
   return { valido: true, esNota: NOTAS.includes(serieYTipo) };
 }
+
+export const esGastoMenor = (ncf: string): boolean => GASTOS_MENORES.includes(ncf.slice(0, 3));

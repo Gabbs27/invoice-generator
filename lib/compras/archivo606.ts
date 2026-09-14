@@ -6,14 +6,19 @@ import type { Compra } from './tipos';
 // Instructivo del 606: hasta 10,000 registros por archivo.
 export const MAXIMO_DE_REGISTROS = 10_000;
 
+// Como GenerarArchivo en la herramienta 606: una línea por registro, sin salto después de la
+// última. Los archivos que la Oficina Virtual aceptó separan las líneas con LF.
+const FIN_DE_LINEA = '\n';
+
 const CERO = BigInt(0);
 
-// Lo que la NG 07-2018 no fija se escribe como en los archivos de la herramienta 606 de la DGII que
-// la Oficina Virtual aceptó (docs/plans/2026-09-13-dgii-606-design.md, "Formato del archivo").
+// Lo que la NG 07-2018 no fija se escribe como la herramienta 606 de la DGII (sus macros) y los
+// archivos suyos que la Oficina Virtual aceptó (docs/plans/2026-09-13-dgii-606-design.md, "Formato
+// del archivo").
 export const nombreDelArchivo606 = (rnc: string, periodo: string): string =>
   `DGII_F_606_${rnc}_${periodo}.TXT`;
 
-// Dos decimales con punto, y nada cuando el monto es cero.
+// Dos decimales con punto, y nada cuando el monto es cero, como una celda en blanco.
 const monto = (centavos: bigint) => (centavos === CERO ? '' : aMonto(centavos));
 
 const opcional = (valor: string | undefined, campo: string) =>
@@ -39,12 +44,13 @@ function detalle(compra: Compra): string {
     compra.FechaPago ?? '',
     monto(servicios),
     monto(bienes),
-    monto(servicios + bienes),
+    // La herramienta calcula el total y el ITBIS por adelantar en cada fila y los escribe siempre.
+    aMonto(servicios + bienes),
     monto(itbis),
     opcional(compra.ITBISRetenido, 'ITBIS retenido'),
     opcional(compra.ITBISProporcionalidad, 'ITBIS sujeto a proporcionalidad'),
     opcional(compra.ITBISCosto, 'ITBIS llevado al costo'),
-    monto(itbis - alCosto),
+    aMonto(itbis - alCosto),
     // ITBIS percibido en compras: la DGII no lo tiene habilitado.
     '',
     codigo(compra.TipoRetencionISR),
@@ -71,8 +77,5 @@ export function archivo606(rnc: string, periodo: string, compras: Compra[]): str
       `El 606 admite hasta ${MAXIMO_DE_REGISTROS} compras por archivo, y este mes tiene ${compras.length}.`
     );
   }
-  // Cada línea termina en LF, también la última, como en los archivos más recientes de la herramienta.
-  return [`606|${rnc}|${periodo}|${compras.length}`, ...compras.map(detalle)]
-    .map((linea) => `${linea}\n`)
-    .join('');
+  return [`606|${rnc}|${periodo}|${compras.length}`, ...compras.map(detalle)].join(FIN_DE_LINEA);
 }

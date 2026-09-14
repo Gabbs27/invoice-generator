@@ -61,9 +61,10 @@ export async function importarXML(datos: FormData): Promise<ResultadoDeImportar>
 export async function guardarCompra(datos: FormData): Promise<ResultadoDeGuardar> {
   try {
     const compra = leerCompraDelFormulario(datos);
-    const errores = validarCompra(compra);
-    if (errores.length > 0) return { guardado: false, errores };
     const almacenamiento = obtenerAlmacenamiento();
+    const { RNCEmisor } = await almacenamiento.leerEmisor();
+    const errores = validarCompra(compra, RNCEmisor);
+    if (errores.length > 0) return { guardado: false, errores };
     const clave = claveDeCompra(compra);
 
     const original = datos.get('claveOriginal');
@@ -125,7 +126,7 @@ export async function generar606(periodo: string): Promise<ResultadoDel606> {
     }
     // Como la herramienta de la DGII: con una sola compra con errores no hay archivo.
     const errores = lineas.flatMap((linea) =>
-      validarCompra(linea).map((error) => `${linea.NCF} de ${linea.RNCCedula}: ${error}`)
+      validarCompra(linea, RNCEmisor).map((error) => `${linea.NCF} de ${linea.RNCCedula}: ${error}`)
     );
     if (errores.length > 0) return { generado: false, errores };
     return {

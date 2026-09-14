@@ -1,7 +1,7 @@
 import { tipoIdentificacion } from '../ecf/identificacion';
 import { esFecha } from './fechas';
 import { aCentavos, aMonto, esMonto } from './montos';
-import { leerNCFDeCompra, tieneFormaDeNCF } from './ncf';
+import { esGastoMenor, leerNCFDeCompra, tieneFormaDeNCF } from './ncf';
 import {
   esCodigo,
   FORMAS_DE_PAGO,
@@ -28,9 +28,9 @@ const MONTOS = {
 
 type CampoDeMonto = keyof typeof MONTOS;
 
-// Las reglas del instructivo del Formato de Envío 606 (febrero de 2026). Devuelve todos los
-// errores y no solo el primero, para corregirlos de una vez.
-export function validarCompra(compra: Compra): string[] {
+// Las reglas del instructivo del Formato de Envío 606 (febrero de 2026) y de la herramienta 606 de
+// la DGII. Devuelve todos los errores y no solo el primero, para corregirlos de una vez.
+export function validarCompra(compra: Compra, rncDelNegocio: string): string[] {
   const errores: string[] = [];
 
   if (tipoIdentificacion(compra.RNCCedula) === null) {
@@ -50,6 +50,11 @@ export function validarCompra(compra: Compra): string[] {
   }
   if (ncf.valido && !ncf.esNota && compra.NCFModificado !== undefined) {
     errores.push(`${compra.NCF} no es una nota: el NCF modificado va solo en notas de débito y de crédito.`);
+  }
+  // Herramienta 606 (ValidarIdentificacion): el comprobante de gastos menores lo emite quien
+  // reporta, así que la casilla 1 lleva su propio RNC. La herramienta solo lo revisa en B13.
+  if (ncf.valido && esGastoMenor(compra.NCF) && compra.RNCCedula !== rncDelNegocio) {
+    errores.push(`${compra.NCF} es de gastos menores: va con el RNC del negocio, ${rncDelNegocio}.`);
   }
 
   if (!esFecha(compra.FechaComprobante)) {
