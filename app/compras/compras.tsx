@@ -10,7 +10,7 @@ import {
   periodoAnterior,
   periodoSiguiente,
 } from '@/lib/compras/fechas';
-import { TAMANO_MAXIMO_DEL_XML } from '@/lib/compras/limites';
+import { DEMASIADO_GRANDE, TAMANO_MAXIMO_DEL_XML } from '@/lib/compras/limites';
 import { aCentavos, aMonto } from '@/lib/compras/montos';
 import {
   claveDeCompra,
@@ -281,7 +281,7 @@ function ImportarXML({
       // Un archivo de más no llega a la acción: Next la rechaza antes, sin decir por qué.
       const archivo = datos.get('xml');
       if (archivo instanceof File && archivo.size > TAMANO_MAXIMO_DEL_XML) {
-        return { importado: false, errores: ['El archivo es demasiado grande para ser un e-CF.'] };
+        return { importado: false, errores: [DEMASIADO_GRANDE] };
       }
       try {
         const nuevo = await importarXML(datos);

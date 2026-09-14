@@ -64,6 +64,18 @@ async function ecfParaLaDemostracion(): Promise<string> {
   return resultado.xml;
 }
 
+// La compra que sale del e-CF de la demostración, completada.
+const completada = {
+  RNCCedula: '123456789',
+  TipoBienesServicios: '9',
+  NCF: 'E310000000001',
+  FechaComprobante: '2026-09-12',
+  MontoServicios: '0.00',
+  MontoBienes: '500.00',
+  ITBISFacturado: '90.00',
+  FormaPago: '1',
+};
+
 afterEach(() => {
   vi.unstubAllEnvs();
   delete (globalThis as Record<string, unknown>)[CLAVE_DEL_PROCESO];
@@ -151,16 +163,6 @@ describe('acciones de compras', () => {
       porCompletar: ['TipoBienesServicios', 'FormaPago'],
       xml,
     });
-    const completada = {
-      RNCCedula: '123456789',
-      TipoBienesServicios: '9',
-      NCF: 'E310000000001',
-      FechaComprobante: '2026-09-12',
-      MontoServicios: '0.00',
-      MontoBienes: '500.00',
-      ITBISFacturado: '90.00',
-      FormaPago: '1',
-    };
     expect(await guardarCompra(formulario({ ...completada, xml }))).toEqual({
       guardado: true,
       clave: '123456789_E310000000001',
@@ -168,6 +170,22 @@ describe('acciones de compras', () => {
     expect(await importarXML(formulario({ xml }))).toEqual({
       importado: false,
       errores: [expect.stringMatching(/ya está anotada/)],
+    });
+  });
+
+  // En la página el XML llega como archivo: del campo de archivo al importar, y como Blob al
+  // guardar.
+  it('importa y guarda el XML cuando llega como archivo', async () => {
+    vi.stubEnv('VERCEL', '1');
+    const xml = await ecfParaLaDemostracion();
+    const importar = new FormData();
+    importar.append('xml', new File([xml], 'ecf.xml', { type: 'text/xml' }));
+    expect(await importarXML(importar)).toMatchObject({ importado: true, xml });
+    const guardar = formulario(completada);
+    guardar.append('xml', new Blob([xml], { type: 'application/xml' }), 'compra.xml');
+    expect(await guardarCompra(guardar)).toEqual({
+      guardado: true,
+      clave: '123456789_E310000000001',
     });
   });
 
