@@ -56,6 +56,8 @@ The environment picks the mode:
   that tool generated and DGII accepted: a `606|RNC|AAAAMM|count` header and 23
   fields per line. What only DGII can check (an active supplier, an authorized
   NCF, an accepted e-CF) shows up when it processes the upload.
+- A purchase with no ITBIS, debit and credit notes, and retentions haven't been
+  through DGII yet: run the first file that has one through DGII's pre-validator.
 - There's no 607: DGII doesn't take e-CF in it (e-CF FAQ, question 1.4.13).
 
 ## Running it locally
