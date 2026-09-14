@@ -94,11 +94,12 @@ function bienesYServicios(documento: Document, totales: Document | Element): Cla
   const items = documento.getElementsByTagName('Item');
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    const indicador = texto(item, 'IndicadorFacturacion') ?? '';
+    // Los indicadores son enteros en el XSD, que acepta 01: se comparan como números.
+    const indicador = String(Number(texto(item, 'IndicadorFacturacion')));
     if (!BASES.some(([codigo]) => codigo === indicador)) continue;
     const clases = porTasa.get(indicador) ?? { bienes: CERO, servicios: CERO };
     const montoItem = centavos(texto(item, 'MontoItem'), 'MontoItem');
-    const clase = texto(item, 'IndicadorBienoServicio') === '2' ? 'servicios' : 'bienes';
+    const clase = Number(texto(item, 'IndicadorBienoServicio')) === 2 ? 'servicios' : 'bienes';
     clases[clase] += montoItem;
     todas[clase] += montoItem;
     porTasa.set(indicador, clases);
