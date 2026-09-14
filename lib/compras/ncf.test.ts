@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { esGastoMenor, leerNCFDeCompra, tieneFormaDeNCF } from './ncf';
+import { emitidoPorQuienCompra, leerNCFDeCompra, tieneFormaDeNCF } from './ncf';
 
 describe('NCF de compras', () => {
   it('acepta una factura de crédito fiscal de serie B y un e-CF', () => {
@@ -41,10 +41,12 @@ describe('NCF de compras', () => {
     }
   });
 
-  it('reconoce los comprobantes de gastos menores', () => {
-    expect(esGastoMenor('B1300000001')).toBe(true);
-    expect(esGastoMenor('E430000000001')).toBe(true);
-    expect(esGastoMenor('B0100000001')).toBe(false);
+  it('reconoce los comprobantes que emite quien compra', () => {
+    expect(emitidoPorQuienCompra('B1300000001')).toBe('gastos menores');
+    expect(emitidoPorQuienCompra('E430000000001')).toBe('gastos menores');
+    expect(emitidoPorQuienCompra('B1700000001')).toBe('pagos al exterior');
+    expect(emitidoPorQuienCompra('E470000000001')).toBe('pagos al exterior');
+    expect(emitidoPorQuienCompra('B0100000001')).toBeUndefined();
   });
 
   it('rechaza lo que no tiene la forma de un NCF', () => {

@@ -1,7 +1,7 @@
 import { tipoIdentificacion } from '../ecf/identificacion';
 import { esFecha } from './fechas';
 import { aCentavos, aMonto, esMonto } from './montos';
-import { esGastoMenor, leerNCFDeCompra, tieneFormaDeNCF } from './ncf';
+import { emitidoPorQuienCompra, leerNCFDeCompra, tieneFormaDeNCF } from './ncf';
 import {
   esCodigo,
   FORMAS_DE_PAGO,
@@ -51,10 +51,11 @@ export function validarCompra(compra: Compra, rncDelNegocio: string): string[] {
   if (ncf.valido && !ncf.esNota && compra.NCFModificado !== undefined) {
     errores.push(`${compra.NCF} no es una nota: el NCF modificado va solo en notas de débito y de crédito.`);
   }
-  // Herramienta 606 (ValidarIdentificacion): el comprobante de gastos menores lo emite quien
-  // reporta, así que la casilla 1 lleva su propio RNC. La herramienta solo lo revisa en B13.
-  if (ncf.valido && esGastoMenor(compra.NCF) && compra.RNCCedula !== rncDelNegocio) {
-    errores.push(`${compra.NCF} es de gastos menores: va con el RNC del negocio, ${rncDelNegocio}.`);
+  // Los comprobantes de gastos menores y de pagos al exterior los emite quien reporta, así que la
+  // casilla 1 lleva su propio RNC (ver emitidoPorQuienCompra en ncf.ts).
+  const propio = ncf.valido ? emitidoPorQuienCompra(compra.NCF) : undefined;
+  if (propio !== undefined && compra.RNCCedula !== rncDelNegocio) {
+    errores.push(`${compra.NCF} es de ${propio}: va con el RNC del negocio, ${rncDelNegocio}.`);
   }
 
   if (!esFecha(compra.FechaComprobante)) {
