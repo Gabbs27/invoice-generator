@@ -76,7 +76,7 @@ describe('acciones de compras', () => {
       nombre: 'DGII_F_606_000000000_202609.TXT',
       contenido:
         '606|000000000|202609|1\n' +
-        '987654321|1|02|B0100000123||20260905||1000.00||1000.00|180.00||||180.00||||||||01\n',
+        '987654321|1|02|B0100000123||20260905||1000.00||1000.00|180.00||||180.00||||||||01',
     });
   });
 
@@ -89,6 +89,14 @@ describe('acciones de compras', () => {
     expect(await generar606('202609')).toEqual({
       generado: false,
       errores: [expect.stringMatching(/en cero/)],
+    });
+  });
+
+  it('pide el RNC del negocio en un comprobante de gastos menores', async () => {
+    vi.stubEnv('VERCEL', '1');
+    expect(await guardarCompra(formulario({ ...anotada, NCF: 'B1300000001' }))).toEqual({
+      guardado: false,
+      errores: [expect.stringMatching(/gastos menores/)],
     });
   });
 
