@@ -59,30 +59,78 @@ function fechaDel606(valor: string): string {
   return `${partes[3]}${partes[2]}${partes[1]}`;
 }
 
-// El 606 separa el monto sin impuestos en bienes y servicios, y el e-CF solo lo da por ítem, con
-// descuentos o recargos que pueden ser globales. Se reparte el total sin impuestos
-// (MontoGravadoTotal más MontoExento) en proporción a los MontoItem de cada clase. Es exacto cuando
-// todos los ítems son de una clase, que es lo común, y proporcional cuando se mezclan.
-function bienesYServicios(documento: Document): { bienes: bigint; servicios: bigint } {
-  const base =
-    centavos(texto(documento, 'MontoGravadoTotal'), 'MontoGravadoTotal') +
-    centavos(texto(documento, 'MontoExento'), 'MontoExento');
+// Por IndicadorFacturacion, el elemento de Totales con su base sin impuestos, ya con los descuentos
+// y recargos globales: MontoGravadoI1 a I3 para las tres tasas del ITBIS y MontoExento para lo
+// exento. El 0, no facturable, no entra en los totales.
+const BASES = [
+  ['1', 'MontoGravadoI1'],
+  ['2', 'MontoGravadoI2'],
+  ['3', 'MontoGravadoI3'],
+  ['4', 'MontoExento'],
+] as const;
+
+interface Clases {
+  bienes: bigint;
+  servicios: bigint;
+}
+
+// Reparte una base en proporción a los montos de cada clase, con redondeo al centavo y la mitad
+// hacia arriba, como en lib/ecf/calculo.ts. Sin montos, todo es bienes.
+function repartir(base: bigint, { bienes, servicios }: Clases): Clases {
+  const suma = bienes + servicios;
+  if (suma === CERO) return { bienes: base, servicios: CERO };
+  const deServicios = (base * servicios * DOS + suma) / (suma * DOS);
+  return { bienes: base - deServicios, servicios: deServicios };
+}
+
+// El 606 separa el monto sin impuestos en bienes y servicios, y el e-CF solo lo da por ítem. Cada
+// base de Totales se reparte entre los ítems de su tasa en proporción a sus MontoItem: dentro de
+// una tasa todos llevan el mismo ITBIS, así que la proporción vale también con precios con ITBIS.
+// Es exacto cuando una tasa tiene ítems de una sola clase, que es lo común.
+function bienesYServicios(documento: Document, totales: Document | Element): Clases {
+  const monto = (elemento: string) => centavos(texto(totales, elemento), elemento);
+  const porTasa = new Map<string, Clases>();
+  const todas: Clases = { bienes: CERO, servicios: CERO };
   const items = documento.getElementsByTagName('Item');
-  let sumaBienes = CERO;
-  let sumaServicios = CERO;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    // IndicadorFacturacion 0 es no facturable: no entra en los totales.
-    if (texto(item, 'IndicadorFacturacion') === '0') continue;
-    const monto = centavos(texto(item, 'MontoItem'), 'MontoItem');
-    if (texto(item, 'IndicadorBienoServicio') === '2') sumaServicios += monto;
-    else sumaBienes += monto;
+    const indicador = texto(item, 'IndicadorFacturacion') ?? '';
+    if (!BASES.some(([codigo]) => codigo === indicador)) continue;
+    const clases = porTasa.get(indicador) ?? { bienes: CERO, servicios: CERO };
+    const montoItem = centavos(texto(item, 'MontoItem'), 'MontoItem');
+    const clase = texto(item, 'IndicadorBienoServicio') === '2' ? 'servicios' : 'bienes';
+    clases[clase] += montoItem;
+    todas[clase] += montoItem;
+    porTasa.set(indicador, clases);
   }
-  const suma = sumaBienes + sumaServicios;
-  if (suma === CERO) return { bienes: base, servicios: CERO };
-  // Redondeo al centavo, la mitad hacia arriba, como en lib/ecf/calculo.ts.
-  const servicios = (base * sumaServicios * DOS + suma) / (suma * DOS);
-  return { bienes: base - servicios, servicios };
+
+  // Los MontoGravadoI son condicionales en el e-CF: si no suman MontoGravadoTotal, falta el
+  // desglose por tasa y se reparte todo junto.
+  const gravadoPorTasa =
+    monto('MontoGravadoI1') + monto('MontoGravadoI2') + monto('MontoGravadoI3');
+  if (gravadoPorTasa !== monto('MontoGravadoTotal')) {
+    return repartir(monto('MontoGravadoTotal') + monto('MontoExento'), todas);
+  }
+
+  const resultado: Clases = { bienes: CERO, servicios: CERO };
+  // Una base sin ítems de su tasa, como un recargo sobre una tasa que ningún ítem usa, se reparte
+  // como el resto de la compra.
+  let sinItems = CERO;
+  for (const [indicador, elemento] of BASES) {
+    const clases = porTasa.get(indicador);
+    if (clases === undefined || clases.bienes + clases.servicios === CERO) {
+      sinItems += monto(elemento);
+      continue;
+    }
+    const parte = repartir(monto(elemento), clases);
+    resultado.bienes += parte.bienes;
+    resultado.servicios += parte.servicios;
+  }
+  const resto = repartir(sinItems, todas);
+  return {
+    bienes: resultado.bienes + resto.bienes,
+    servicios: resultado.servicios + resto.servicios,
+  };
 }
 
 // Formato e-CF, Tabla I: 001 es la propina legal; 002 (CDT) y 005 (primera placa) son otros
@@ -127,7 +175,7 @@ function borradorDesde(documento: Document, tipo: TipoImportable): ResultadoDeIm
     return valor;
   };
   const totales = documento.getElementsByTagName('Totales')[0] ?? documento;
-  const { bienes, servicios } = bienesYServicios(documento);
+  const { bienes, servicios } = bienesYServicios(documento, totales);
   const { propina, otros, selectivo } = impuestosAdicionales(totales);
   const itbisRetenido = centavos(texto(totales, 'TotalITBISRetenido'), 'TotalITBISRetenido');
   const isrRetenido = centavos(texto(totales, 'TotalISRRetencion'), 'TotalISRRetencion');

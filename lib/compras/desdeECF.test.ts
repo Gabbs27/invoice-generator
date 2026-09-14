@@ -11,16 +11,12 @@ import { importarECF, type DependenciasDeImportacion } from './desdeECF';
 const NEGOCIO = '101010101';
 const credencial = crearCredencialDeDemostracion();
 
+// Cada caso valida contra el XSD de su tipo. Lo que el emisor de este proyecto no arma (tabla de
+// pagos, impuestos adicionales, retenciones, descuentos globales, notas) sale de editar un e-CF
+// emitido: la firma deja de valer, pero el XSD no revisa firmas.
 const conXSD: DependenciasDeImportacion = {
   rncDelNegocio: NEGOCIO,
   validar: (xml, tipo) => validarContraXSD(xml, leerEsquema(tipo)),
-};
-
-// Para los casos que el emisor de este proyecto no arma (tabla de pagos, impuestos adicionales,
-// retenciones, notas): se edita el XML, y la firma deja de valer, así que se salta el XSD.
-const sinXSD: DependenciasDeImportacion = {
-  rncDelNegocio: NEGOCIO,
-  validar: async () => ({ valido: true, errores: [] }),
 };
 
 const factura: SolicitudDeEmision = {
@@ -53,6 +49,39 @@ async function ecf(cambios: Partial<SolicitudDeEmision> = {}): Promise<string> {
   if (!resultado.emitido) throw new Error(resultado.errores.join(' '));
   return resultado.xml;
 }
+
+// Cambia una parte del XML y falla si no la encuentra: un caso no pasa sin editar nada.
+function cambiar(xml: string, buscado: string | RegExp, nuevo: string): string {
+  const cambiado = xml.replace(buscado, nuevo);
+  if (cambiado === xml) throw new Error(`No está ${String(buscado)} en el e-CF.`);
+  return cambiado;
+}
+
+// Un bien gravado al 18 % y un servicio exento.
+const bienGravadoYServicioExento = (
+  bien: string,
+  servicio: string
+): SolicitudDeEmision['Items'] => [
+  {
+    NombreItem: 'Resma de papel',
+    IndicadorBienoServicio: 1,
+    CantidadItem: '1',
+    PrecioUnitarioItem: bien,
+    IndicadorFacturacion: 1,
+  },
+  {
+    NombreItem: 'Asesoría',
+    IndicadorBienoServicio: 2,
+    CantidadItem: '1',
+    PrecioUnitarioItem: servicio,
+    IndicadorFacturacion: 4,
+  },
+];
+
+const REFERENCIA =
+  '<InformacionReferencia><NCFModificado>E310000000009</NCFModificado>' +
+  '<FechaNCFModificado>01-09-2026</FechaNCFModificado><CodigoModificacion>3</CodigoModificacion>' +
+  '</InformacionReferencia>';
 
 describe('importar un e-CF recibido', () => {
   it('llena la compra con lo que dice un e-CF 31 válido', async () => {
@@ -97,6 +126,47 @@ describe('importar un e-CF recibido', () => {
     });
   });
 
+  // Con precios con ITBIS, cada MontoItem trae el impuesto de su tasa: se reparte la base de cada
+  // tasa (MontoGravadoI1 a I3 y MontoExento) entre los ítems de esa tasa.
+  it('reparte por tasa cuando los precios traen ITBIS', async () => {
+    const xml = await ecf({
+      IndicadorMontoGravado: 1,
+      Items: bienGravadoYServicioExento('118.00', '100.00'),
+    });
+    expect(await importarECF(xml, conXSD)).toMatchObject({
+      importado: true,
+      borrador: { MontoBienes: '100.00', MontoServicios: '100.00', ITBISFacturado: '18.00' },
+    });
+  });
+
+  // Un descuento global de 50.00 sobre lo gravado al 18 %: baja MontoGravadoI1 y no toca lo exento.
+  it('aplica un descuento global solo a la tasa que descuenta', async () => {
+    const totales = [
+      ['MontoGravadoTotal', '250.00'],
+      ['MontoGravadoI1', '250.00'],
+      ['TotalITBIS', '45.00'],
+      ['TotalITBIS1', '45.00'],
+      ['MontoTotal', '495.00'],
+    ] as const;
+    let xml = await ecf({ Items: bienGravadoYServicioExento('300.00', '200.00') });
+    for (const [elemento, valor] of totales) {
+      const etiqueta = new RegExp(`<${elemento}>[^<]*</${elemento}>`);
+      xml = cambiar(xml, etiqueta, `<${elemento}>${valor}</${elemento}>`);
+    }
+    const descuento =
+      '<DescuentosORecargos><DescuentoORecargo><NumeroLinea>1</NumeroLinea>' +
+      '<TipoAjuste>D</TipoAjuste>' +
+      '<DescripcionDescuentooRecargo>Descuento por volumen</DescripcionDescuentooRecargo>' +
+      '<TipoValor>$</TipoValor><MontoDescuentooRecargo>50.00</MontoDescuentooRecargo>' +
+      '<IndicadorFacturacionDescuentooRecargo>1</IndicadorFacturacionDescuentooRecargo>' +
+      '</DescuentoORecargo></DescuentosORecargos>';
+    xml = cambiar(xml, '</DetallesItems>', `</DetallesItems>${descuento}`);
+    expect(await importarECF(xml, conXSD)).toMatchObject({
+      importado: true,
+      borrador: { MontoBienes: '250.00', MontoServicios: '200.00', ITBISFacturado: '45.00' },
+    });
+  });
+
   it('una venta a crédito sin tabla de pagos es una compra a crédito', async () => {
     const xml = await ecf({ TipoPago: 2, FechaLimitePago: '30-09-2026' });
     expect(await importarECF(xml, conXSD)).toMatchObject({
@@ -110,23 +180,26 @@ describe('importar un e-CF recibido', () => {
     const forma = (codigo: string, monto: string) =>
       `<FormaDePago><FormaPago>${codigo}</FormaPago><MontoPago>${monto}</MontoPago></FormaDePago>`;
     const base = await ecf();
-    const permuta = base.replace(
+    const permuta = cambiar(
+      base,
       '</TipoPago>',
       `</TipoPago><TablaFormasPago>${forma('6', '590.00')}</TablaFormasPago>`
     );
-    const mixta = base.replace(
+    const mixta = cambiar(
+      base,
       '</TipoPago>',
       `</TipoPago><TablaFormasPago>${forma('1', '300.00')}${forma('3', '290.00')}</TablaFormasPago>`
     );
-    expect(await importarECF(permuta, sinXSD)).toMatchObject({ borrador: { FormaPago: '5' } });
-    expect(await importarECF(mixta, sinXSD)).toMatchObject({ borrador: { FormaPago: '7' } });
+    expect(await importarECF(permuta, conXSD)).toMatchObject({ borrador: { FormaPago: '5' } });
+    expect(await importarECF(mixta, conXSD)).toMatchObject({ borrador: { FormaPago: '7' } });
   });
 
   // Formato e-CF, Tabla I: 001 propina legal; 002 y 005 otros; 003, 004 y del 006 al 039, selectivo.
   it('reparte los impuestos adicionales en propina, otros impuestos y selectivo', async () => {
     const impuesto = (tipo: string, monto: string) =>
       `<ImpuestoAdicional><TipoImpuesto>${tipo}</TipoImpuesto><TasaImpuestoAdicional>10</TasaImpuestoAdicional>${monto}</ImpuestoAdicional>`;
-    const xml = (await ecf()).replace(
+    const xml = cambiar(
+      await ecf(),
       '<MontoTotal>',
       '<ImpuestosAdicionales>' +
         impuesto('001', '<OtrosImpuestosAdicionales>50.00</OtrosImpuestosAdicionales>') +
@@ -137,34 +210,50 @@ describe('importar un e-CF recibido', () => {
         ) +
         '</ImpuestosAdicionales><MontoTotal>'
     );
-    expect(await importarECF(xml, sinXSD)).toMatchObject({
+    expect(await importarECF(xml, conXSD)).toMatchObject({
       borrador: { PropinaLegal: '50.00', OtrosImpuestos: '5.00', ImpuestoSelectivo: '20.00' },
     });
   });
 
   it('trae las retenciones y pide la fecha de pago y el tipo de retención', async () => {
-    const xml = (await ecf()).replace(
+    const xml = cambiar(
+      await ecf(),
       '</MontoTotal>',
       '</MontoTotal><TotalITBISRetenido>27.00</TotalITBISRetenido><TotalISRRetencion>50.00</TotalISRRetencion>'
     );
-    expect(await importarECF(xml, sinXSD)).toMatchObject({
+    expect(await importarECF(xml, conXSD)).toMatchObject({
       borrador: { ITBISRetenido: '27.00', MontoRetencionRenta: '50.00' },
       porCompletar: ['TipoBienesServicios', 'FormaPago', 'FechaPago', 'TipoRetencionISR'],
     });
   });
 
+  it('importa una nota de débito con el NCF que modifica', async () => {
+    let xml = cambiar(
+      await ecf(),
+      '<TipoeCF>31</TipoeCF><eNCF>E310000000001</eNCF>',
+      '<TipoeCF>33</TipoeCF><eNCF>E330000000001</eNCF>'
+    );
+    xml = cambiar(xml, '<FechaHoraFirma>', `${REFERENCIA}<FechaHoraFirma>`);
+    expect(await importarECF(xml, conXSD)).toMatchObject({
+      importado: true,
+      borrador: { NCF: 'E330000000001', NCFModificado: 'E310000000009', MontoBienes: '500.00' },
+    });
+  });
+
   it('importa una nota de crédito con el NCF que modifica', async () => {
-    const xml = (await ecf())
-      .replace(
-        '<TipoeCF>31</TipoeCF><eNCF>E310000000001</eNCF>',
-        '<TipoeCF>34</TipoeCF><eNCF>E340000000001</eNCF>'
-      )
-      .replace(/<FechaVencimientoSecuencia>[^<]*<\/FechaVencimientoSecuencia>/, '')
-      .replace(
-        '<FechaHoraFirma>',
-        '<InformacionReferencia><NCFModificado>E310000000009</NCFModificado><FechaNCFModificado>01-09-2026</FechaNCFModificado><CodigoModificacion>3</CodigoModificacion></InformacionReferencia><FechaHoraFirma>'
-      );
-    expect(await importarECF(xml, sinXSD)).toMatchObject({
+    let xml = cambiar(
+      await ecf(),
+      '<TipoeCF>31</TipoeCF><eNCF>E310000000001</eNCF>',
+      '<TipoeCF>34</TipoeCF><eNCF>E340000000001</eNCF>'
+    );
+    // El 34 no lleva FechaVencimientoSecuencia y sí IndicadorNotaCredito.
+    xml = cambiar(
+      xml,
+      /<FechaVencimientoSecuencia>[^<]*<\/FechaVencimientoSecuencia>/,
+      '<IndicadorNotaCredito>0</IndicadorNotaCredito>'
+    );
+    xml = cambiar(xml, '<FechaHoraFirma>', `${REFERENCIA}<FechaHoraFirma>`);
+    expect(await importarECF(xml, conXSD)).toMatchObject({
       importado: true,
       borrador: { NCF: 'E340000000001', NCFModificado: 'E310000000009' },
     });
@@ -188,7 +277,7 @@ describe('importar un e-CF recibido', () => {
   });
 
   it('rechaza un XML que no valida contra el XSD de su tipo', async () => {
-    const xml = (await ecf()).replace('<TipoIngresos>01</TipoIngresos>', '');
+    const xml = cambiar(await ecf(), '<TipoIngresos>01</TipoIngresos>', '');
     expect(await importarECF(xml, conXSD)).toMatchObject({
       importado: false,
       errores: [expect.stringMatching(/no valida contra el XSD/), expect.any(String)],
@@ -196,18 +285,18 @@ describe('importar un e-CF recibido', () => {
   });
 
   it('rechaza los tipos que no se importan', async () => {
-    const xml = (await ecf()).replace('<TipoeCF>31</TipoeCF>', '<TipoeCF>41</TipoeCF>');
-    expect(await importarECF(xml, sinXSD)).toEqual({
+    const xml = cambiar(await ecf(), '<TipoeCF>31</TipoeCF>', '<TipoeCF>41</TipoeCF>');
+    expect(await importarECF(xml, conXSD)).toEqual({
       importado: false,
       errores: [expect.stringMatching(/31, 33 y 34/)],
     });
   });
 
   it('rechaza lo que no es un e-CF', async () => {
-    expect(await importarECF('<Factura/>', sinXSD)).toEqual({
+    expect(await importarECF('<Factura/>', conXSD)).toEqual({
       importado: false,
       errores: [expect.stringMatching(/no es un e-CF/)],
     });
-    expect(await importarECF('hola', sinXSD)).toMatchObject({ importado: false });
+    expect(await importarECF('hola', conXSD)).toMatchObject({ importado: false });
   });
 });
