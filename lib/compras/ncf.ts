@@ -4,8 +4,15 @@
 const TIPOS_B: readonly string[] = ['01', '03', '04', '11', '12', '13', '14', '15', '17'];
 const TIPOS_E: readonly string[] = ['31', '33', '34', '41', '43', '44', '45', '47'];
 const NOTAS: readonly string[] = ['B03', 'B04', 'E33', 'E34'];
-// El comprobante de gastos menores lo emite quien compra.
-const GASTOS_MENORES: readonly string[] = ['B13', 'E43'];
+// Los comprobantes que emite quien compra, que en la casilla 1 llevan su propio RNC: gastos
+// menores (la herramienta 606 lo revisa en B13) y pagos al exterior (el instructivo del 606 lo pide
+// en B17).
+const EMITIDOS_POR_QUIEN_COMPRA: Readonly<Record<string, string>> = {
+  B13: 'gastos menores',
+  E43: 'gastos menores',
+  B17: 'pagos al exterior',
+  E47: 'pagos al exterior',
+};
 // NG 06-2018: la factura de consumo es la que se emite para el consumidor final; la de crédito
 // fiscal, la que tiene valor fiscal.
 const CONSUMO: readonly string[] = ['B02', 'E32'];
@@ -33,4 +40,10 @@ export function leerNCFDeCompra(ncf: string): LecturaDeNCF {
   return { valido: true, esNota: NOTAS.includes(serieYTipo) };
 }
 
-export const esGastoMenor = (ncf: string): boolean => GASTOS_MENORES.includes(ncf.slice(0, 3));
+// El nombre del comprobante, si lo emite quien compra.
+export function emitidoPorQuienCompra(ncf: string): string | undefined {
+  const serieYTipo = ncf.slice(0, 3);
+  return Object.hasOwn(EMITIDOS_POR_QUIEN_COMPRA, serieYTipo)
+    ? EMITIDOS_POR_QUIEN_COMPRA[serieYTipo]
+    : undefined;
+}

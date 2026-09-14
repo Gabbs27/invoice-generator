@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { compraDePrueba } from './ejemplos';
-import type { Compra, FormaPago, TipoBienesServicios } from './tipos';
+import type { Compra, FormaPago, TipoBienesServicios, TipoRetencionISR } from './tipos';
 import { validarCompra } from './validar';
 
 // El negocio que reporta el 606.
@@ -112,6 +112,33 @@ describe('validar una compra', () => {
     ]);
   });
 
+  it('rechaza un NCF modificado mal formado', () => {
+    expect(validar(compraDePrueba({ NCF: 'B0400000007', NCFModificado: 'B01' }))).toEqual([
+      expect.stringMatching(/NCF modificado inválido/),
+    ]);
+  });
+
+  it('rechaza una fecha de pago que no existe', () => {
+    expect(validar(compraDePrueba({ FechaPago: '20260230' }))).toEqual([
+      expect.stringMatching(/Fecha de pago inválida/),
+    ]);
+  });
+
+  it('no deja que el ITBIS retenido pase del facturado', () => {
+    expect(validar(compraDePrueba({ ITBISRetenido: '180.01', FechaPago: '20260920' }))).toEqual([
+      expect.stringMatching(/ITBIS retenido no puede pasar/),
+    ]);
+  });
+
+  it('rechaza un tipo de retención en ISR fuera del 1 al 9', () => {
+    const compra = compraDePrueba({
+      MontoRetencionRenta: '100.00',
+      TipoRetencionISR: '10' as TipoRetencionISR,
+      FechaPago: '20260920',
+    });
+    expect(validar(compra)).toEqual([expect.stringMatching(/Tipo de retención en ISR inválido/)]);
+  });
+
   // Herramienta 606 de la DGII (ValidarIdentificacion): un comprobante de gastos menores lo emite
   // quien reporta, así que la casilla 1 lleva su propio RNC.
   it('pide el RNC del negocio en un comprobante de gastos menores', () => {
@@ -122,5 +149,17 @@ describe('validar una compra', () => {
       expect.stringMatching(/gastos menores/),
     ]);
     expect(validar(compraDePrueba({ NCF: 'B1300000001', RNCCedula: NEGOCIO }))).toEqual([]);
+  });
+
+  // Instructivo del 606: un NCF para pagos al exterior (B17) lleva el RNC o la cédula del
+  // encabezado. El e-CF 47 tampoco nombra a un proveedor con RNC.
+  it('pide el RNC del negocio en un comprobante de pagos al exterior', () => {
+    expect(validar(compraDePrueba({ NCF: 'B1700000001' }))).toEqual([
+      expect.stringMatching(/pagos al exterior.*101010101/),
+    ]);
+    expect(validar(compraDePrueba({ NCF: 'E470000000001' }))).toEqual([
+      expect.stringMatching(/pagos al exterior/),
+    ]);
+    expect(validar(compraDePrueba({ NCF: 'E470000000001', RNCCedula: NEGOCIO }))).toEqual([]);
   });
 });
