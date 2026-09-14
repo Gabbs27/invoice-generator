@@ -167,6 +167,35 @@ describe('importar un e-CF recibido', () => {
     });
   });
 
+  // Los indicadores son enteros en el XSD, que acepta 01 y 02: se comparan como números.
+  it('lee los indicadores escritos con ceros a la izquierda', async () => {
+    let xml = await ecf({
+      Items: [
+        {
+          NombreItem: 'Instalación',
+          IndicadorBienoServicio: 2,
+          CantidadItem: '1',
+          PrecioUnitarioItem: '100.00',
+          IndicadorFacturacion: 1,
+        },
+      ],
+    });
+    xml = cambiar(
+      xml,
+      '<IndicadorFacturacion>1</IndicadorFacturacion>',
+      '<IndicadorFacturacion>01</IndicadorFacturacion>'
+    );
+    xml = cambiar(
+      xml,
+      '<IndicadorBienoServicio>2</IndicadorBienoServicio>',
+      '<IndicadorBienoServicio>02</IndicadorBienoServicio>'
+    );
+    expect(await importarECF(xml, conXSD)).toMatchObject({
+      importado: true,
+      borrador: { MontoServicios: '100.00', MontoBienes: '0.00', ITBISFacturado: '18.00' },
+    });
+  });
+
   it('una venta a crédito sin tabla de pagos es una compra a crédito', async () => {
     const xml = await ecf({ TipoPago: 2, FechaLimitePago: '30-09-2026' });
     expect(await importarECF(xml, conXSD)).toMatchObject({
