@@ -139,6 +139,61 @@ describe('importar un e-CF recibido', () => {
     });
   });
 
+  // MontoGravadoI1 a I3 son condicionales: sin ellos se reparte todo junto, y cada MontoItem entra
+  // sin el ITBIS que trae su precio.
+  it('reparte sin el ITBIS de los precios cuando falta el desglose por tasa', async () => {
+    const xml = cambiar(
+      await ecf({
+        IndicadorMontoGravado: 1,
+        Items: bienGravadoYServicioExento('118.00', '100.00'),
+      }),
+      /<MontoGravadoI1>[^<]*<\/MontoGravadoI1>/,
+      ''
+    );
+    expect(await importarECF(xml, conXSD)).toMatchObject({
+      importado: true,
+      borrador: { MontoBienes: '100.00', MontoServicios: '100.00', ITBISFacturado: '18.00' },
+    });
+  });
+
+  // Un recargo global de 10.00 al 16 %, que ningún ítem usa: se reparte como el resto de la compra,
+  // también con cada MontoItem sin su ITBIS.
+  it('reparte una base sin ítems de su tasa sin el ITBIS de los precios', async () => {
+    const totales = [
+      ['MontoGravadoTotal', '110.00'],
+      ['TotalITBIS', '19.60'],
+      ['MontoTotal', '229.60'],
+    ] as const;
+    let xml = await ecf({
+      IndicadorMontoGravado: 1,
+      Items: bienGravadoYServicioExento('118.00', '100.00'),
+    });
+    for (const [elemento, valor] of totales) {
+      const etiqueta = new RegExp(`<${elemento}>[^<]*</${elemento}>`);
+      xml = cambiar(xml, etiqueta, `<${elemento}>${valor}</${elemento}>`);
+    }
+    // Lo de la tasa 2 va después de lo de la tasa 1, en el orden del XSD.
+    xml = cambiar(
+      xml,
+      '</MontoGravadoI1>',
+      '</MontoGravadoI1><MontoGravadoI2>10.00</MontoGravadoI2>'
+    );
+    xml = cambiar(xml, '</ITBIS1>', '</ITBIS1><ITBIS2>16</ITBIS2>');
+    xml = cambiar(xml, '</TotalITBIS1>', '</TotalITBIS1><TotalITBIS2>1.60</TotalITBIS2>');
+    const recargo =
+      '<DescuentosORecargos><DescuentoORecargo><NumeroLinea>1</NumeroLinea>' +
+      '<TipoAjuste>R</TipoAjuste>' +
+      '<DescripcionDescuentooRecargo>Cargo por entrega</DescripcionDescuentooRecargo>' +
+      '<TipoValor>$</TipoValor><MontoDescuentooRecargo>10.00</MontoDescuentooRecargo>' +
+      '<IndicadorFacturacionDescuentooRecargo>2</IndicadorFacturacionDescuentooRecargo>' +
+      '</DescuentoORecargo></DescuentosORecargos>';
+    xml = cambiar(xml, '</DetallesItems>', `</DetallesItems>${recargo}`);
+    expect(await importarECF(xml, conXSD)).toMatchObject({
+      importado: true,
+      borrador: { MontoBienes: '105.00', MontoServicios: '105.00', ITBISFacturado: '19.60' },
+    });
+  });
+
   // Un descuento global de 50.00 sobre lo gravado al 18 %: baja MontoGravadoI1 y no toca lo exento.
   it('aplica un descuento global solo a la tasa que descuenta', async () => {
     const totales = [

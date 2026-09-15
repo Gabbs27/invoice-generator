@@ -1,4 +1,5 @@
 import { DOMParser } from '@xmldom/xmldom';
+import { TASAS_ITBIS } from '../ecf/calculo';
 import { aMonto } from './montos';
 import type { Compra, FormaPago } from './tipos';
 
@@ -27,6 +28,7 @@ export interface DependenciasDeImportacion {
 
 const CERO = BigInt(0);
 const DOS = BigInt(2);
+const CIEN = BigInt(100);
 
 // Formato e-CF, TablaFormasPago: 1 efectivo, 2 cheque/transferencia/depósito, 3 tarjeta, 4 crédito,
 // 5 bonos (solo en el 32), 6 permuta, 7 nota de crédito, 8 otras. Instructivo del 606, casilla 23:
@@ -83,14 +85,32 @@ function repartir(base: bigint, { bienes, servicios }: Clases): Clases {
   return { bienes: base - deServicios, servicios: deServicios };
 }
 
+// Por IndicadorFacturacion gravado, el elemento de Totales con la tasa del ITBIS, en porcentaje.
+const TASAS = { '1': 'ITBIS1', '2': 'ITBIS2', '3': 'ITBIS3' } as const;
+
+// Un monto con el ITBIS incluido, sin él: al centavo, con la mitad hacia arriba.
+function sinITBIS(monto: bigint, tasa: bigint): bigint {
+  const divisor = CIEN + tasa;
+  return (monto * CIEN * DOS + divisor) / (divisor * DOS);
+}
+
 // El 606 separa el monto sin impuestos en bienes y servicios, y el e-CF solo lo da por ítem. Cada
 // base de Totales se reparte entre los ítems de su tasa en proporción a sus MontoItem: dentro de
 // una tasa todos llevan el mismo ITBIS, así que la proporción vale también con precios con ITBIS.
 // Es exacto cuando una tasa tiene ítems de una sola clase, que es lo común.
 function bienesYServicios(documento: Document, totales: Document | Element): Clases {
   const monto = (elemento: string) => centavos(texto(totales, elemento), elemento);
+  // Entre tasas distintas no sirve el MontoItem con ITBIS (IndicadorMontoGravado 1): lo de una tasa
+  // más alta pesaría de más. Ahí cuenta cada ítem sin su ITBIS, con la tasa de Totales; ITBIS1 a
+  // ITBIS3 son condicionales, y si falta una vale la del Formato e-CF.
+  const conITBIS = Number(texto(documento, 'IndicadorMontoGravado')) === 1;
+  const neto = (montoItem: bigint, indicador: string) => {
+    if (!conITBIS || !Object.hasOwn(TASAS, indicador)) return montoItem;
+    const elemento = TASAS[indicador as keyof typeof TASAS];
+    return sinITBIS(montoItem, BigInt(texto(totales, elemento) ?? TASAS_ITBIS[elemento]));
+  };
   const porTasa = new Map<string, Clases>();
-  const todas: Clases = { bienes: CERO, servicios: CERO };
+  const netas: Clases = { bienes: CERO, servicios: CERO };
   const items = documento.getElementsByTagName('Item');
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -101,16 +121,16 @@ function bienesYServicios(documento: Document, totales: Document | Element): Cla
     const montoItem = centavos(texto(item, 'MontoItem'), 'MontoItem');
     const clase = Number(texto(item, 'IndicadorBienoServicio')) === 2 ? 'servicios' : 'bienes';
     clases[clase] += montoItem;
-    todas[clase] += montoItem;
+    netas[clase] += neto(montoItem, indicador);
     porTasa.set(indicador, clases);
   }
 
   // Los MontoGravadoI son condicionales en el e-CF: si no suman MontoGravadoTotal, falta el
-  // desglose por tasa y se reparte todo junto.
+  // desglose por tasa y se reparte todo junto, con cada ítem sin su ITBIS.
   const gravadoPorTasa =
     monto('MontoGravadoI1') + monto('MontoGravadoI2') + monto('MontoGravadoI3');
   if (gravadoPorTasa !== monto('MontoGravadoTotal')) {
-    return repartir(monto('MontoGravadoTotal') + monto('MontoExento'), todas);
+    return repartir(monto('MontoGravadoTotal') + monto('MontoExento'), netas);
   }
 
   const resultado: Clases = { bienes: CERO, servicios: CERO };
@@ -127,7 +147,7 @@ function bienesYServicios(documento: Document, totales: Document | Element): Cla
     resultado.bienes += parte.bienes;
     resultado.servicios += parte.servicios;
   }
-  const resto = repartir(sinItems, todas);
+  const resto = repartir(sinItems, netas);
   return {
     bienes: resultado.bienes + resto.bienes,
     servicios: resultado.servicios + resto.servicios,
