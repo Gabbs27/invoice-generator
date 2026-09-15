@@ -11,6 +11,7 @@ import {
   type FormaPago,
   type TipoBienesServicios,
 } from './tipos';
+import { validarCompra } from './validar';
 import type { Celda, Fila, Hoja, Libro } from './xlsx';
 
 // Del libro de gastos a compras del 606: lo que dice cada fila y lo que falta revisar. No lee
@@ -361,4 +362,84 @@ export function leerGastos(libro: Libro, contexto: ContextoDeLectura): LecturaDe
     hojas: libro.hojas.map((hoja) => leerHojaDeGastos(hoja, libro.fechas1904, contexto)),
     propuesta: Math.max(propuesta, 0),
   };
+}
+
+// Lo que quien importa cambia en una fila de la vista previa. Lo que no toca queda como lo propuso
+// la lectura.
+export interface EleccionDeFila {
+  tipo?: TipoBienesServicios;
+  clase?: Clase;
+  forma?: FormaPago;
+  // En "Revisa el RNC": la cédula que se propone o el número como vino.
+  rnc?: 'cedula' | 'numero';
+  // La casilla "Anotar", marcada mientras no se desmarque.
+  anotar?: boolean;
+}
+
+export interface OpcionesDeEvaluacion {
+  rncDelNegocio: string;
+  // La forma de pago elegida para las filas que no traen una y cuyo proveedor no tiene historial.
+  formaGeneral?: FormaPago;
+}
+
+export type EstadoDeFila =
+  | { estado: 'lista'; compra: Compra }
+  | { estado: 'revisaRNC'; cedula?: string }
+  | { estado: 'faltaForma' }
+  | { estado: 'noVa'; motivos: string[] };
+
+// La compra que sale de una fila con lo elegido. La fecha de pago es la del comprobante, salvo en
+// una compra a crédito, que todavía no se ha pagado.
+export function compraDeLaFila(
+  fila: FilaDeGastos,
+  eleccion: EleccionDeFila,
+  forma: FormaPago
+): Compra {
+  const cedula = fila.revisarRNC?.cedula;
+  const clase = eleccion.clase ?? fila.clase;
+  const compra: Compra = {
+    RNCCedula: eleccion.rnc === 'cedula' && cedula !== undefined ? cedula : fila.rnc,
+    TipoBienesServicios: eleccion.tipo ?? fila.tipo,
+    NCF: fila.ncf,
+    FechaComprobante: fila.fecha,
+    MontoServicios: clase === 'servicios' ? fila.monto : '0.00',
+    MontoBienes: clase === 'bienes' ? fila.monto : '0.00',
+    ITBISFacturado: fila.itbis,
+    FormaPago: forma,
+  };
+  if (forma !== '4') compra.FechaPago = fila.fecha;
+  if (fila.propina !== '0.00') compra.PropinaLegal = fila.propina;
+  return compra;
+}
+
+export function evaluarFila(
+  fila: FilaDeGastos,
+  eleccion: EleccionDeFila,
+  opciones: OpcionesDeEvaluacion
+): EstadoDeFila {
+  if (fila.noVa !== undefined) return { estado: 'noVa', motivos: [fila.noVa] };
+  if (fila.revisarRNC !== undefined && eleccion.rnc === undefined) {
+    return fila.revisarRNC.cedula === undefined
+      ? { estado: 'revisaRNC' }
+      : { estado: 'revisaRNC', cedula: fila.revisarRNC.cedula };
+  }
+  const forma = eleccion.forma ?? fila.forma ?? opciones.formaGeneral;
+  if (forma === undefined) return { estado: 'faltaForma' };
+  const compra = compraDeLaFila(fila, eleccion, forma);
+  const errores = validarCompra(compra, opciones.rncDelNegocio);
+  return errores.length > 0 ? { estado: 'noVa', motivos: errores } : { estado: 'lista', compra };
+}
+
+// Lo que se guarda: las filas listas con la casilla "Anotar" marcada. Las elecciones van por el
+// número de la fila en Excel.
+export function comprasElegidas(
+  filas: FilaDeGastos[],
+  elecciones: Record<number, EleccionDeFila>,
+  opciones: OpcionesDeEvaluacion
+): Compra[] {
+  return filas.flatMap((fila) => {
+    const eleccion = elecciones[fila.fila] ?? {};
+    const estado = evaluarFila(fila, eleccion, opciones);
+    return estado.estado === 'lista' && eleccion.anotar !== false ? [estado.compra] : [];
+  });
 }

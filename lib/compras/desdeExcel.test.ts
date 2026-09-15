@@ -1,13 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import {
   centavosDeExcel,
+  comprasElegidas,
   digitosDeExcel,
+  evaluarFila,
   fechaDeExcel,
   formaDePagoDelTexto,
   historialDeProveedores,
   leerGastos,
   montoDeLaCelda,
   normalizar,
+  type FilaDeGastos,
   type Historia,
 } from './desdeExcel';
 import { compraDePrueba } from './ejemplos';
@@ -262,5 +265,114 @@ describe('leer las hojas de gastos', () => {
       motivo: 'Al encabezado de la fila 1 le falta: Fecha.',
       filas: [],
     });
+  });
+});
+
+describe('de fila a compra', () => {
+  // El negocio de emisorDePrueba.
+  const opciones = { rncDelNegocio: '123456789' };
+  const fila = (cambios: Partial<FilaDeGastos> = {}): FilaDeGastos => ({
+    fila: 9,
+    proveedor: 'Ferretería Inventada',
+    rnc: '130000001',
+    ncf: 'B0100000001',
+    fecha: '20260905',
+    monto: '1000.00',
+    itbis: '180.00',
+    propina: '0.00',
+    tipo: '9',
+    clase: 'servicios',
+    forma: '3',
+    ...cambios,
+  });
+
+  it('arma la compra con la fecha de pago del comprobante', () => {
+    expect(evaluarFila(fila(), {}, opciones)).toEqual({
+      estado: 'lista',
+      compra: {
+        RNCCedula: '130000001',
+        TipoBienesServicios: '9',
+        NCF: 'B0100000001',
+        FechaComprobante: '20260905',
+        FechaPago: '20260905',
+        MontoServicios: '1000.00',
+        MontoBienes: '0.00',
+        ITBISFacturado: '180.00',
+        FormaPago: '3',
+      },
+    });
+  });
+
+  it('usa el tipo, la clase y la forma de pago que se eligen, y lleva la propina', () => {
+    const eleccion = { tipo: '2', clase: 'bienes', forma: '1' } as const;
+    expect(evaluarFila(fila({ propina: '100.00' }), eleccion, opciones)).toMatchObject({
+      estado: 'lista',
+      compra: {
+        TipoBienesServicios: '2',
+        MontoServicios: '0.00',
+        MontoBienes: '1000.00',
+        FormaPago: '1',
+        PropinaLegal: '100.00',
+      },
+    });
+  });
+
+  it('deja sin fecha de pago una compra a crédito', () => {
+    const estado = evaluarFila(fila({ forma: '4' }), {}, opciones);
+    if (estado.estado !== 'lista') throw new Error(`Esperaba una compra lista y está ${estado.estado}.`);
+    expect(estado.compra.FormaPago).toBe('4');
+    expect(estado.compra).not.toHaveProperty('FechaPago');
+  });
+
+  it('pide la forma de pago, o toma la elegida para todo el libro', () => {
+    expect(evaluarFila(fila({ forma: undefined }), {}, opciones)).toEqual({ estado: 'faltaForma' });
+    expect(
+      evaluarFila(fila({ forma: undefined }), {}, { ...opciones, formaGeneral: '2' })
+    ).toMatchObject({ estado: 'lista', compra: { FormaPago: '2' } });
+  });
+
+  it('no deja pasar un RNC por revisar hasta que se decide', () => {
+    const conCedula = fila({ rnc: '100000009', revisarRNC: { cedula: '00100000009' } });
+    expect(evaluarFila(conCedula, {}, opciones)).toEqual({
+      estado: 'revisaRNC',
+      cedula: '00100000009',
+    });
+    expect(evaluarFila(conCedula, { rnc: 'cedula' }, opciones)).toMatchObject({
+      estado: 'lista',
+      compra: { RNCCedula: '00100000009' },
+    });
+    expect(evaluarFila(conCedula, { rnc: 'numero' }, opciones)).toMatchObject({
+      estado: 'lista',
+      compra: { RNCCedula: '100000009' },
+    });
+    const dudoso = fila({ rnc: '100000000', revisarRNC: {} });
+    expect(evaluarFila(dudoso, {}, opciones)).toEqual({ estado: 'revisaRNC' });
+    expect(evaluarFila(dudoso, { rnc: 'numero' }, opciones)).toMatchObject({
+      estado: 'lista',
+      compra: { RNCCedula: '100000000' },
+    });
+  });
+
+  it('dice por qué no va: lo que dijo la lectura o lo que dice validarCompra', () => {
+    expect(evaluarFila(fila({ noVa: 'Ya está anotada.' }), {}, opciones)).toEqual({
+      estado: 'noVa',
+      motivos: ['Ya está anotada.'],
+    });
+    // Un comprobante de gastos menores lleva el RNC del negocio, no el del proveedor.
+    expect(evaluarFila(fila({ ncf: 'B1300000001' }), {}, opciones)).toEqual({
+      estado: 'noVa',
+      motivos: [expect.stringMatching(/gastos menores/)],
+    });
+  });
+
+  it('guarda solo las filas listas con la casilla marcada', () => {
+    const filas = [
+      fila(),
+      fila({ fila: 10, ncf: 'B0100000002' }),
+      fila({ fila: 11, ncf: 'B0100000003', forma: undefined }),
+      fila({ fila: 12, ncf: 'B0100000004', noVa: 'Ya está anotada.' }),
+    ];
+    const compras = comprasElegidas(filas, { 10: { anotar: false } }, opciones);
+    expect(compras.map((compra) => compra.NCF)).toEqual(['B0100000001']);
   });
 });
