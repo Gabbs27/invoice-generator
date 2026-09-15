@@ -51,3 +51,117 @@ export function armarZip(partes: Record<string, string>, { comprimir = true } = 
   fin.writeUInt32LE(desplazamiento, 16);
   return Buffer.concat([...locales, directorio, fin]);
 }
+
+export type CeldaDePrueba =
+  | string // texto compartido
+  | number
+  | null // celda vacía
+  | { numero: string } // el número tal como va en el XML, como '1.30000001E8'
+  | { formula: string; valor: string }
+  | { enLinea: string };
+
+export interface HojaDePrueba {
+  nombre: string;
+  // La celda de la primera fila y la primera columna, como 'E8' en el libro real. Sin ella, 'A1'.
+  desde?: string;
+  filas: CeldaDePrueba[][];
+}
+
+const DECLARACION = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+const PRINCIPAL = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+const RELACIONES = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+const PAQUETE = 'http://schemas.openxmlformats.org/package/2006/relationships';
+
+const escapar = (texto: string) =>
+  texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const columnaDe = (letras: string) =>
+  [...letras].reduce((numero, letra) => numero * 26 + letra.charCodeAt(0) - 64, 0) - 1;
+
+function letrasDe(columna: number): string {
+  let letras = '';
+  for (let n = columna + 1; n > 0; n = Math.floor((n - 1) / 26)) {
+    letras = String.fromCharCode(65 + ((n - 1) % 26)) + letras;
+  }
+  return letras;
+}
+
+export function armarLibro(
+  hojas: HojaDePrueba[],
+  { fechas1904 = false, rutasAbsolutas = false, prefijo = '' } = {}
+): Buffer {
+  // Con prefijo, los elementos van como x:row, como los escriben algunos programas.
+  const e = (nombre: string) => (prefijo === '' ? nombre : `${prefijo}:${nombre}`);
+  const espacio = prefijo === '' ? `xmlns="${PRINCIPAL}"` : `xmlns:${prefijo}="${PRINCIPAL}"`;
+  const compartidos: string[] = [];
+  const compartido = (texto: string) => {
+    const posicion = compartidos.indexOf(texto);
+    return posicion >= 0 ? posicion : compartidos.push(texto) - 1;
+  };
+
+  const celdaXML = (celda: CeldaDePrueba, referencia: string): string => {
+    if (celda === null) return '';
+    const v = (valor: string | number) => `<${e('v')}>${valor}</${e('v')}>`;
+    if (typeof celda === 'string') {
+      return `<${e('c')} r="${referencia}" t="s">${v(compartido(celda))}</${e('c')}>`;
+    }
+    if (typeof celda === 'number') return `<${e('c')} r="${referencia}">${v(celda)}</${e('c')}>`;
+    if ('numero' in celda) return `<${e('c')} r="${referencia}">${v(celda.numero)}</${e('c')}>`;
+    if ('formula' in celda) {
+      const formula = `<${e('f')}>${escapar(celda.formula)}</${e('f')}>`;
+      return `<${e('c')} r="${referencia}">${formula}${v(celda.valor)}</${e('c')}>`;
+    }
+    const enLinea = `<${e('is')}><${e('t')}>${escapar(celda.enLinea)}</${e('t')}></${e('is')}>`;
+    return `<${e('c')} r="${referencia}" t="inlineStr">${enLinea}</${e('c')}>`;
+  };
+
+  const partes: Record<string, string> = {};
+  hojas.forEach((hoja, i) => {
+    const [, letras, primera] = (hoja.desde ?? 'A1').match(/^([A-Z]+)(\d+)$/) ?? ['', 'A', '1'];
+    const filas = hoja.filas.map((celdas, f) => {
+      const numero = Number(primera) + f;
+      const xml = celdas.map((celda, c) =>
+        celdaXML(celda, `${letrasDe(columnaDe(letras) + c)}${numero}`)
+      );
+      return `<${e('row')} r="${numero}">${xml.join('')}</${e('row')}>`;
+    });
+    partes[`xl/worksheets/sheet${i + 1}.xml`] =
+      `${DECLARACION}<${e('worksheet')} ${espacio}><${e('sheetData')}>${filas.join('')}` +
+      `</${e('sheetData')}></${e('worksheet')}>`;
+  });
+
+  const destino = (ruta: string) => (rutasAbsolutas ? `/xl/${ruta}` : ruta);
+  const relaciones = hojas.map(
+    (_, i) =>
+      `<Relationship Id="rId${i + 1}" Type="${RELACIONES}/worksheet" ` +
+      `Target="${destino(`worksheets/sheet${i + 1}.xml`)}"/>`
+  );
+  relaciones.push(
+    `<Relationship Id="rId${hojas.length + 1}" Type="${RELACIONES}/sharedStrings" ` +
+      `Target="${destino('sharedStrings.xml')}"/>`
+  );
+  const hojasXML = hojas
+    .map(
+      (hoja, i) =>
+        `<${e('sheet')} name="${escapar(hoja.nombre)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`
+    )
+    .join('');
+  const preferencias = fechas1904 ? `<${e('workbookPr')} date1904="1"/>` : '';
+  partes['xl/workbook.xml'] =
+    `${DECLARACION}<${e('workbook')} ${espacio} xmlns:r="${RELACIONES}">${preferencias}` +
+    `<${e('sheets')}>${hojasXML}</${e('sheets')}></${e('workbook')}>`;
+  partes['xl/_rels/workbook.xml.rels'] =
+    `${DECLARACION}<Relationships xmlns="${PAQUETE}">${relaciones.join('')}</Relationships>`;
+
+  // Al final: los índices del texto compartido salen de armar las hojas.
+  const textos = compartidos
+    .map((texto) => {
+      const t = `<${e('t')} xml:space="preserve">${escapar(texto)}</${e('t')}>`;
+      return `<${e('si')}>${t}</${e('si')}>`;
+    })
+    .join('');
+  partes['xl/sharedStrings.xml'] =
+    `${DECLARACION}<${e('sst')} ${espacio} count="${compartidos.length}" ` +
+    `uniqueCount="${compartidos.length}">${textos}</${e('sst')}>`;
+  return armarZip(partes);
+}
