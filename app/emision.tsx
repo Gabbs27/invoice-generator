@@ -13,7 +13,7 @@ import { conMiles } from '@/lib/formato';
 import type { Modo } from '@/lib/storage';
 import { emitir, type ResultadoDeLaAccion } from './acciones';
 import estilos from './emision.module.css';
-import { Campo, Titulo } from './partes';
+import { Campo, SIN_RESPUESTA, Titulo } from './partes';
 
 // Códigos y nombres del Formato e-CF v1.0: TipoIngresos (pág. 7), TipoPago (pág. 9),
 // IndicadorFacturacion (pág. 37) e IndicadorBienoServicio (pág. 38).
@@ -87,9 +87,13 @@ export function Emision({ modo, habilitado }: { modo: Modo; habilitado: boolean 
   const [emisiones, setEmisiones] = useState(0);
   const [resultado, accion, emitiendo] = useActionState<ResultadoDeLaAccion | null, FormData>(
     async (_anterior, datos) => {
-      const nuevo = await emitir(datos);
-      if (nuevo.emitido) setEmisiones((cuenta) => cuenta + 1);
-      return nuevo;
+      try {
+        const nuevo = await emitir(datos);
+        if (nuevo.emitido) setEmisiones((cuenta) => cuenta + 1);
+        return nuevo;
+      } catch {
+        return { emitido: false, errores: [SIN_RESPUESTA] };
+      }
     },
     null
   );
@@ -600,7 +604,21 @@ function Resultado({ resultado, modo }: { resultado: ResultadoDeLaAccion | null;
               <li key={indice}>{error}</li>
             ))}
           </ul>
-          <p>No se guardó nada y el número de secuencia sigue libre.</p>
+          {resultado.errores.includes(SIN_RESPUESTA) ? (
+            // Sin respuesta no se sabe si la acción corrió: pudo emitir y perderse solo la respuesta.
+            <p>
+              Si la petición llegó al servidor, el comprobante pudo emitirse
+              {modo === 'local' ? (
+                <>
+                  : revisa <code>datos/facturas/</code> antes de volver a emitir.
+                </>
+              ) : (
+                ' de todos modos.'
+              )}
+            </p>
+          ) : (
+            <p>No se guardó nada y el número de secuencia sigue libre.</p>
+          )}
         </div>
       )}
     </div>
