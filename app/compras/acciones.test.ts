@@ -1,13 +1,25 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { compraDePrueba } from '@/lib/compras/ejemplos';
+import { armarLibro } from '@/lib/compras/libroDePrueba';
 import type { FormaPago } from '@/lib/compras/tipos';
 import { crearCredencialDeDemostracion } from '@/lib/credencial';
 import { emitirECF } from '@/lib/emitir';
 import { leerEsquema } from '@/lib/esquemas';
 import { CLAVE_DEL_PROCESO, EMISOR_DE_DEMOSTRACION, obtenerAlmacenamiento } from '@/lib/storage';
+import { AlmacenamientoEnArchivos } from '@/lib/storage/archivos';
 import { emisorDePrueba } from '@/lib/storage/contrato';
 import { AlmacenamientoEnMemoria } from '@/lib/storage/memoria';
-import { borrarCompra, generar606, guardarCompra, importarXML } from './acciones';
+import {
+  borrarCompra,
+  generar606,
+  guardarCompra,
+  guardarComprasDelLibro,
+  importarXML,
+  leerLibroDeGastos,
+} from './acciones';
 
 // refresh() solo existe dentro de Next.
 vi.mock('next/cache', () => ({ refresh: vi.fn() }));
@@ -197,4 +209,103 @@ describe('acciones de compras', () => {
       errores: [expect.stringMatching(/no es de esta compra/)],
     });
   });
+});
+
+// Modo local, con una carpeta de datos temporal y el emisor de prueba (RNC 123456789).
+async function enModoLocal(prueba: () => Promise<void>) {
+  vi.stubEnv('VERCEL', '');
+  const directorio = mkdtempSync(join(tmpdir(), 'datos-'));
+  try {
+    writeFileSync(join(directorio, 'emisor.json'), JSON.stringify(emisorDePrueba()));
+    (globalThis as Record<string, unknown>)[CLAVE_DEL_PROCESO] = new AlmacenamientoEnArchivos(directorio);
+    await prueba();
+  } finally {
+    rmSync(directorio, { recursive: true, force: true });
+  }
+}
+
+// Un libro inventado, con el mes de septiembre de 2026 (46270 es el día 5).
+function libroDeGastos(contenido?: BlobPart): FormData {
+  const datos = new FormData();
+  datos.append('periodo', '202609');
+  const libro = armarLibro([
+    {
+      nombre: 'Septiembre',
+      filas: [
+        ['Proveedor', 'RNC', 'NCF', 'Fecha', 'ITBS', 'Monto total', 'Método de pago'],
+        ['Ferretería Inventada', 130000001, 'B0100000001', 46270, 180, 1180, 'Efectivo'],
+        ['Papelería Inventada', 100000004, 'B0100000002', 46271, 18, 118, 'Efectivo'],
+      ],
+    },
+  ]);
+  datos.append('libro', new File([contenido ?? new Uint8Array(libro)], 'gastos.xlsx'));
+  return datos;
+}
+
+describe('acciones del libro de gastos', () => {
+  it('no importa el libro en la demostración', async () => {
+    vi.stubEnv('VERCEL', '1');
+    expect(await leerLibroDeGastos(libroDeGastos())).toEqual({
+      leido: false,
+      errores: [expect.stringMatching(/solo se puede en modo local/)],
+    });
+    expect(await guardarComprasDelLibro([compraDePrueba()])).toEqual({
+      guardado: false,
+      errores: [expect.stringMatching(/solo se puede en modo local/)],
+    });
+  });
+
+  it('lee el libro con el historial y lo ya anotado', () =>
+    enModoLocal(async () => {
+      await obtenerAlmacenamiento().guardarCompra(
+        compraDePrueba({
+          RNCCedula: '100000004',
+          NCF: 'B0100000002',
+          FechaComprobante: '20260801',
+          TipoBienesServicios: '11',
+        })
+      );
+      const resultado = await leerLibroDeGastos(libroDeGastos());
+      expect(resultado).toMatchObject({ leido: true, rncDelNegocio: '123456789' });
+      if (!resultado.leido) return;
+      expect(resultado.lectura.propuesta).toBe(0);
+      const [ferreteria, papeleria] = resultado.lectura.hojas[0].filas;
+      expect(ferreteria).toMatchObject({ ncf: 'B0100000001', monto: '1000.00', tipo: '9', forma: '1' });
+      expect(papeleria).toMatchObject({ ncf: 'B0100000002', tipo: '11', noVa: 'Ya está anotada.' });
+    }));
+
+  it('no lee lo que no es un libro, ni un archivo de más de 1 MB', () =>
+    enModoLocal(async () => {
+      expect(await leerLibroDeGastos(libroDeGastos('hola'))).toEqual({
+        leido: false,
+        errores: [expect.stringMatching(/no es un libro .xlsx/)],
+      });
+      expect(await leerLibroDeGastos(libroDeGastos('x'.repeat(1_000_001)))).toEqual({
+        leido: false,
+        errores: [expect.stringMatching(/más de 1 MB/)],
+      });
+    }));
+
+  it('guarda las compras elegidas y dice cuáles no se guardaron', () =>
+    enModoLocal(async () => {
+      const buena = compraDePrueba({ RNCCedula: '130000001' });
+      const conError = compraDePrueba({ NCF: 'B0100000124', FormaPago: '8' as FormaPago });
+      expect(await guardarComprasDelLibro([buena, buena, conError])).toEqual({
+        guardado: true,
+        guardadas: 1,
+        noGuardadas: [
+          expect.stringMatching(/ya está anotada/),
+          expect.stringMatching(/^B0100000124 de 987654321: Forma de pago inválida/),
+        ],
+      });
+      expect(await obtenerAlmacenamiento().listarCompras()).toEqual([buena]);
+    }));
+
+  it('no guarda lo que no tiene la forma de una compra', () =>
+    enModoLocal(async () => {
+      const nada = { guardado: false, errores: ['No llegaron compras para guardar.'] };
+      expect(await guardarComprasDelLibro([{ NCF: 'B0100000001' }])).toEqual(nada);
+      expect(await guardarComprasDelLibro([])).toEqual(nada);
+      expect(await guardarComprasDelLibro('compras')).toEqual(nada);
+    }));
 });

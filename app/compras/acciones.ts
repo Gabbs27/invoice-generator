@@ -3,15 +3,22 @@
 import { refresh } from 'next/cache';
 import { archivo606, nombreDelArchivo606 } from '@/lib/compras/archivo606';
 import { importarECF, type ResultadoDeImportacion } from '@/lib/compras/desdeECF';
+import { historialDeProveedores, leerGastos, type LecturaDeGastos } from '@/lib/compras/desdeExcel';
 import { esPeriodo } from '@/lib/compras/fechas';
 import { leerCompraDelFormulario } from '@/lib/compras/formulario';
-import { DEMASIADO_GRANDE, TAMANO_MAXIMO_DEL_XML } from '@/lib/compras/limites';
+import {
+  DEMASIADO_GRANDE,
+  LIBRO_DEMASIADO_GRANDE,
+  TAMANO_MAXIMO_DEL_LIBRO,
+  TAMANO_MAXIMO_DEL_XML,
+} from '@/lib/compras/limites';
 import { comprasDelPeriodo } from '@/lib/compras/periodo';
-import { claveDeCompra } from '@/lib/compras/tipos';
+import { claveDeCompra, esCompra } from '@/lib/compras/tipos';
 import { validarCompra } from '@/lib/compras/validar';
+import { leerLibro } from '@/lib/compras/xlsx';
 import { validarContraXSD } from '@/lib/ecf/validar';
 import { leerEsquema } from '@/lib/esquemas';
-import { obtenerAlmacenamiento } from '@/lib/storage';
+import { modoDeEjecucion, obtenerAlmacenamiento } from '@/lib/storage';
 
 export type ResultadoDeGuardar =
   | { guardado: true; clave: string }
@@ -21,6 +28,12 @@ export type ResultadoDeBorrar = { borrado: true } | { borrado: false; errores: s
 export type ResultadoDel606 =
   | { generado: true; nombre: string; contenido: string }
   | { generado: false; errores: string[] };
+export type ResultadoDeLeerElLibro =
+  | { leido: true; lectura: LecturaDeGastos; rncDelNegocio: string }
+  | { leido: false; errores: string[] };
+export type ResultadoDeGuardarDelLibro =
+  | { guardado: true; guardadas: number; noGuardadas: string[] }
+  | { guardado: false; errores: string[] };
 
 const mensaje = (error: unknown) => (error as Error).message;
 
@@ -142,5 +155,78 @@ export async function generar606(periodo: string): Promise<ResultadoDel606> {
     };
   } catch (error) {
     return { generado: false, errores: [mensaje(error)] };
+  }
+}
+
+// En la demostración, lo que se guarda lo ve cualquiera que entre: un libro real mostraría
+// proveedores y montos.
+const SOLO_EN_LOCAL =
+  'Importar el libro de gastos solo se puede en modo local: en la demostración, lo que se guarda lo ve cualquiera que entre.';
+
+const NO_LLEGARON_COMPRAS = 'No llegaron compras para guardar.';
+
+export async function leerLibroDeGastos(datos: FormData): Promise<ResultadoDeLeerElLibro> {
+  try {
+    if (modoDeEjecucion() !== 'local') return { leido: false, errores: [SOLO_EN_LOCAL] };
+    const periodo = datos.get('periodo');
+    if (typeof periodo !== 'string' || !esPeriodo(periodo)) {
+      return { leido: false, errores: [`Periodo inválido: ${String(periodo)}.`] };
+    }
+    const archivo = datos.get('libro');
+    if (!(archivo instanceof File) || archivo.size === 0) {
+      return { leido: false, errores: ['Elige el libro de gastos (.xlsx).'] };
+    }
+    if (archivo.size > TAMANO_MAXIMO_DEL_LIBRO) {
+      return { leido: false, errores: [LIBRO_DEMASIADO_GRANDE] };
+    }
+    const libro = leerLibro(new Uint8Array(await archivo.arrayBuffer()));
+    const almacenamiento = obtenerAlmacenamiento();
+    const { RNCEmisor } = await almacenamiento.leerEmisor();
+    const compras = await almacenamiento.listarCompras();
+    const lectura = leerGastos(libro, {
+      periodo,
+      anotadas: new Set(compras.map(claveDeCompra)),
+      historial: historialDeProveedores(compras),
+    });
+    return { leido: true, lectura, rncDelNegocio: RNCEmisor };
+  } catch (error) {
+    return { leido: false, errores: [mensaje(error)] };
+  }
+}
+
+// El servidor no se fía de la vista previa: vuelve a validar cada compra, y wx no deja guardar dos
+// veces la misma.
+export async function guardarComprasDelLibro(
+  compras: unknown
+): Promise<ResultadoDeGuardarDelLibro> {
+  try {
+    if (modoDeEjecucion() !== 'local') return { guardado: false, errores: [SOLO_EN_LOCAL] };
+    if (!Array.isArray(compras) || compras.length === 0 || !compras.every(esCompra)) {
+      return { guardado: false, errores: [NO_LLEGARON_COMPRAS] };
+    }
+    const almacenamiento = obtenerAlmacenamiento();
+    const { RNCEmisor } = await almacenamiento.leerEmisor();
+    let guardadas = 0;
+    const noGuardadas: string[] = [];
+    for (const compra of compras) {
+      const cual = `${compra.NCF} de ${compra.RNCCedula}`;
+      const errores = validarCompra(compra, RNCEmisor);
+      if (errores.length > 0) {
+        noGuardadas.push(`${cual}: ${errores.join(' ')}`);
+        continue;
+      }
+      try {
+        await almacenamiento.guardarCompra(compra);
+        guardadas += 1;
+      } catch (error) {
+        // El error de una compra duplicada ya dice cuál es.
+        const motivo = mensaje(error);
+        noGuardadas.push(motivo.includes(compra.NCF) ? motivo : `${cual}: ${motivo}`);
+      }
+    }
+    if (guardadas > 0) refresh();
+    return { guardado: true, guardadas, noGuardadas };
+  } catch (error) {
+    return { guardado: false, errores: [mensaje(error)] };
   }
 }
