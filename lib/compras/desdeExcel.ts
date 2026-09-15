@@ -1,4 +1,12 @@
-import type { FormaPago } from './tipos';
+import { aCentavos, esMonto } from './montos';
+import {
+  esCodigo,
+  FORMAS_DE_PAGO,
+  TIPOS_DE_BIENES_Y_SERVICIOS,
+  type Compra,
+  type FormaPago,
+  type TipoBienesServicios,
+} from './tipos';
 import type { Celda } from './xlsx';
 
 // Del libro de gastos a compras del 606: lo que dice cada fila y lo que falta revisar. No lee
@@ -89,4 +97,41 @@ const FORMAS_POR_PALABRA: [string, FormaPago][] = [
 export function formaDePagoDelTexto(texto: string): FormaPago | undefined {
   const normalizado = normalizar(texto);
   return FORMAS_POR_PALABRA.find(([palabra]) => normalizado.includes(palabra))?.[1];
+}
+
+export type Clase = 'servicios' | 'bienes';
+
+export interface Historia {
+  tipo: TipoBienesServicios;
+  clase: Clase;
+  forma: FormaPago;
+}
+
+const centavosDelMonto = (valor: string) => (esMonto(valor) ? aCentavos(valor, 'Monto') : CERO);
+
+// La compra guardada más reciente de cada proveedor propone el tipo, la clase y la forma de pago de
+// sus filas. La clase es la del monto mayor.
+export function historialDeProveedores(compras: Compra[]): Record<string, Historia> {
+  const recientes = new Map<string, Compra>();
+  for (const compra of compras) {
+    if (!esCodigo(TIPOS_DE_BIENES_Y_SERVICIOS, compra.TipoBienesServicios)) continue;
+    if (!esCodigo(FORMAS_DE_PAGO, compra.FormaPago)) continue;
+    const anterior = recientes.get(compra.RNCCedula);
+    if (anterior === undefined || compra.FechaComprobante >= anterior.FechaComprobante) {
+      recientes.set(compra.RNCCedula, compra);
+    }
+  }
+  return Object.fromEntries(
+    [...recientes].map(([rnc, compra]): [string, Historia] => [
+      rnc,
+      {
+        tipo: compra.TipoBienesServicios,
+        clase:
+          centavosDelMonto(compra.MontoBienes) > centavosDelMonto(compra.MontoServicios)
+            ? 'bienes'
+            : 'servicios',
+        forma: compra.FormaPago,
+      },
+    ])
+  );
 }

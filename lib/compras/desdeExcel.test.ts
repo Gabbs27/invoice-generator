@@ -4,9 +4,12 @@ import {
   digitosDeExcel,
   fechaDeExcel,
   formaDePagoDelTexto,
+  historialDeProveedores,
   montoDeLaCelda,
   normalizar,
 } from './desdeExcel';
+import { compraDePrueba } from './ejemplos';
+import type { FormaPago } from './tipos';
 
 describe('valores de Excel', () => {
   it('normaliza etiquetas sin mayúsculas, tildes ni espacios', () => {
@@ -63,5 +66,41 @@ describe('valores de Excel', () => {
     expect(formaDePagoDelTexto('Mixto')).toBe('7');
     expect(formaDePagoDelTexto('')).toBeUndefined();
     expect(formaDePagoDelTexto('Pagado')).toBeUndefined();
+  });
+});
+
+describe('historial de proveedores', () => {
+  it('toma el tipo, la clase y la forma de pago de la compra más reciente de cada proveedor', () => {
+    const historial = historialDeProveedores([
+      compraDePrueba({ RNCCedula: '130000001', FechaComprobante: '20260805' }),
+      compraDePrueba({
+        RNCCedula: '130000001',
+        NCF: 'B0100000124',
+        FechaComprobante: '20260812',
+        TipoBienesServicios: '9',
+        MontoServicios: '0.00',
+        MontoBienes: '500.00',
+        FormaPago: '3',
+      }),
+      compraDePrueba({ RNCCedula: '100000004', FechaComprobante: '20260701' }),
+    ]);
+    expect(historial).toEqual({
+      '130000001': { tipo: '9', clase: 'bienes', forma: '3' },
+      '100000004': { tipo: '2', clase: 'servicios', forma: '1' },
+    });
+  });
+
+  // Un archivo de datos/compras editado a mano puede traer códigos que no existen.
+  it('no toma una compra con códigos que no existen', () => {
+    const historial = historialDeProveedores([
+      compraDePrueba({ RNCCedula: '130000001', FechaComprobante: '20260805' }),
+      compraDePrueba({
+        RNCCedula: '130000001',
+        NCF: 'B0100000124',
+        FechaComprobante: '20260812',
+        FormaPago: '8' as FormaPago,
+      }),
+    ]);
+    expect(historial['130000001']).toEqual({ tipo: '2', clase: 'servicios', forma: '1' });
   });
 });
