@@ -93,6 +93,11 @@
   cursor: pointer;
 }
 
+.secundario:disabled {
+  color: var(--tinta-tenue);
+  cursor: not-allowed;
+}
+
 .error {
   display: block;
   margin-top: 0.3rem;
