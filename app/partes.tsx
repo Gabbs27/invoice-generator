@@ -3,6 +3,11 @@ import estilos from './emision.module.css';
 
 // Piezas de formulario que comparten la página de emitir y la de compras.
 
+// Si la llamada al servidor falla (sin conexión, o una petición que Next rechaza antes de llegar a
+// la acción, como una de más de 1 MB), la página lo dice en vez de caerse.
+export const SIN_RESPUESTA =
+  'No se pudo hablar con el servidor. Revisa la conexión y vuelve a intentarlo.';
+
 export function Titulo({
   id,
   letra,

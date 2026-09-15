@@ -21,7 +21,7 @@ import {
 } from '@/lib/compras/tipos';
 import { conMiles } from '@/lib/formato';
 import emision from '../emision.module.css';
-import { Campo, Titulo } from '../partes';
+import { Campo, SIN_RESPUESTA, Titulo } from '../partes';
 import {
   borrarCompra,
   generar606,
@@ -45,11 +45,6 @@ function montoLegible(...valores: string[]): string {
     return valores.join(' + ');
   }
 }
-
-// Si la llamada al servidor falla (sin conexión, o una respuesta que no llega), la página lo dice
-// en vez de caerse.
-const SIN_RESPUESTA =
-  'No se pudo hablar con el servidor. Revisa la conexión y vuelve a intentarlo.';
 
 // Lo que el formulario muestra: una compra nueva, una por corregir o una importada de un XML.
 interface Edicion {
