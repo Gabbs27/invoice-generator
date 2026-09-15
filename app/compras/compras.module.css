@@ -115,3 +115,46 @@
 .resultadoDeImportar {
   flex-basis: 100%;
 }
+
+.vistaPrevia {
+  margin: 0 0 2rem;
+}
+
+.tituloDelLibro {
+  margin: 0 0 1rem;
+  font-family: var(--fuente-titulares), Georgia, serif;
+  font-size: 1.45rem;
+  font-weight: 400;
+}
+
+.vistaPrevia > * + * {
+  margin-top: 1.4rem;
+}
+
+.tablaDelLibro {
+  min-width: 90rem;
+}
+
+.tablaDelLibro select {
+  min-width: 8.5rem;
+  font-size: 0.85rem;
+}
+
+.filaQueNoVa td {
+  color: var(--tinta-tenue);
+}
+
+.lista {
+  font-weight: 700;
+  color: var(--verde);
+}
+
+.pendiente {
+  font-weight: 700;
+  color: var(--azul);
+}
+
+.noVa {
+  font-size: 0.85rem;
+  color: var(--tinta-suave);
+}
