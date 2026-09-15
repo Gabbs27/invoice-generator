@@ -5,6 +5,7 @@ import { startTransition, useActionState, useState, type ReactNode } from 'react
 import type { CampoPorCompletar } from '@/lib/compras/desdeECF';
 import {
   esPeriodo,
+  fechaLegible,
   haciaElNavegador,
   nombreDelPeriodo,
   periodoAnterior,
@@ -20,6 +21,7 @@ import {
   type Compra,
 } from '@/lib/compras/tipos';
 import { conMiles } from '@/lib/formato';
+import type { Modo } from '@/lib/storage';
 import emision from '../emision.module.css';
 import { Campo, SIN_RESPUESTA, Titulo } from '../partes';
 import {
@@ -32,9 +34,7 @@ import {
   type ResultadoDel606,
 } from './acciones';
 import estilos from './compras.module.css';
-
-const fechaLegible = (fecha: string) =>
-  `${fecha.slice(6, 8)}/${fecha.slice(4, 6)}/${fecha.slice(0, 4)}`;
+import { ImportarLibro } from './importarLibro';
 
 // Lo guardado puede venir editado a mano en datos/: si no es un monto, se muestra tal cual.
 function montoLegible(...valores: string[]): string {
@@ -56,10 +56,12 @@ interface Edicion {
 
 export function Compras({
   periodo,
+  modo,
   lineas,
   completas,
 }: {
   periodo: string;
+  modo: Modo;
   lineas: Compra[];
   completas: Record<string, Compra>;
 }) {
@@ -95,6 +97,7 @@ export function Compras({
             {aviso}
           </p>
         )}
+        <ImportarLibro periodo={periodo} modo={modo} />
         {edicion.clave === undefined && (
           <ImportarXML
             alImportar={({ borrador, porCompletar, xml }) =>

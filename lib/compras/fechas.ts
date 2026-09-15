@@ -61,10 +61,19 @@ export function periodoSiguiente(periodo: string): string {
   return mes === 12 ? armarPeriodo(anio + 1, 1) : armarPeriodo(anio, mes + 1);
 }
 
-export function nombreDelPeriodo(periodo: string): string {
-  const [anio, mes] = partesDelPeriodo(periodo);
-  return `${MESES[mes - 1]} de ${anio}`;
+export function nombreDelMes(periodo: string): string {
+  const [, mes] = partesDelPeriodo(periodo);
+  return MESES[mes - 1];
 }
+
+export function nombreDelPeriodo(periodo: string): string {
+  const [anio] = partesDelPeriodo(periodo);
+  return `${nombreDelMes(periodo)} de ${anio}`;
+}
+
+// Una fecha AAAAMMDD para leerla en la página y en los mensajes.
+export const fechaLegible = (fecha: string) =>
+  `${fecha.slice(6, 8)}/${fecha.slice(4, 6)}/${fecha.slice(0, 4)}`;
 
 // El campo de fecha del navegador manda AAAA-MM-DD. Que la fecha exista lo valida validarCompra.
 export function desdeElNavegador(valor: string): string {

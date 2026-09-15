@@ -3,7 +3,9 @@ import {
   desdeElNavegador,
   esFecha,
   esPeriodo,
+  fechaLegible,
   haciaElNavegador,
+  nombreDelMes,
   nombreDelPeriodo,
   periodoAnterior,
   periodoEnRD,
@@ -57,5 +59,10 @@ describe('fechas del 606', () => {
 
   it('nombra el periodo en español', () => {
     expect(nombreDelPeriodo('202609')).toBe('septiembre de 2026');
+    expect(nombreDelMes('202609')).toBe('septiembre');
+  });
+
+  it('escribe una fecha AAAAMMDD como dd/mm/aaaa', () => {
+    expect(fechaLegible('20260905')).toBe('05/09/2026');
   });
 });

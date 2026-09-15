@@ -84,3 +84,42 @@ export function exigirClaveDeCompra(clave: string): string {
   }
   return clave;
 }
+
+const CAMPOS_OBLIGATORIOS = [
+  'RNCCedula',
+  'TipoBienesServicios',
+  'NCF',
+  'FechaComprobante',
+  'MontoServicios',
+  'MontoBienes',
+  'ITBISFacturado',
+  'FormaPago',
+] as const satisfies readonly (keyof Compra)[];
+
+const CAMPOS_OPCIONALES = [
+  'NCFModificado',
+  'FechaPago',
+  'ITBISRetenido',
+  'ITBISProporcionalidad',
+  'ITBISCosto',
+  'TipoRetencionISR',
+  'MontoRetencionRenta',
+  'ImpuestoSelectivo',
+  'OtrosImpuestos',
+  'PropinaLegal',
+] as const satisfies readonly (keyof Compra)[];
+
+// Lo que llega a una acción de servidor puede venir de cualquiera: tiene que traer los campos de
+// una compra, como texto, y ninguno más. Las reglas del 606 las aplica validarCompra.
+export function esCompra(valor: unknown): valor is Compra {
+  if (typeof valor !== 'object' || valor === null || Array.isArray(valor)) return false;
+  const campos = valor as Record<string, unknown>;
+  const conocidos: readonly string[] = [...CAMPOS_OBLIGATORIOS, ...CAMPOS_OPCIONALES];
+  return (
+    Object.keys(campos).every((campo) => conocidos.includes(campo)) &&
+    CAMPOS_OBLIGATORIOS.every((campo) => typeof campos[campo] === 'string') &&
+    CAMPOS_OPCIONALES.every(
+      (campo) => campos[campo] === undefined || typeof campos[campo] === 'string'
+    )
+  );
+}

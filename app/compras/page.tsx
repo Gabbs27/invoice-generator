@@ -57,7 +57,13 @@ export default async function PaginaDeCompras({ searchParams }: PageProps<'/comp
       ) : (
         // Next conserva el estado del navegador al cambiar ?periodo=: con la llave, cada mes
         // empieza limpio y no muestra el 606 ni los avisos de otro.
-        <Compras key={periodo} periodo={periodo} lineas={mes.lineas} completas={mes.completas} />
+        <Compras
+          key={periodo}
+          periodo={periodo}
+          modo={modoDeEjecucion()}
+          lineas={mes.lineas}
+          completas={mes.completas}
+        />
       )}
     </main>
   );

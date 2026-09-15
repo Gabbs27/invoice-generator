@@ -4,6 +4,7 @@ import {
   claveDeCompra,
   esClaveDeCompra,
   esCodigo,
+  esCompra,
   exigirClaveDeCompra,
   FORMAS_DE_PAGO,
   TIPOS_DE_BIENES_Y_SERVICIOS,
@@ -36,5 +37,27 @@ describe('tipos de la compra', () => {
       expect(esClaveDeCompra(clave)).toBe(false);
     }
     expect(() => exigirClaveDeCompra('../emisor')).toThrow(/Clave de compra inválida/);
+  });
+});
+
+describe('forma de una compra', () => {
+  it('reconoce una compra, con o sin los campos opcionales', () => {
+    expect(esCompra(compraDePrueba())).toBe(true);
+    expect(esCompra(compraDePrueba({ FechaPago: '20260905', PropinaLegal: '100.00' }))).toBe(true);
+  });
+
+  it('rechaza lo que no tiene la forma de una compra', () => {
+    const sinNCF: Record<string, unknown> = { ...compraDePrueba() };
+    delete sinNCF.NCF;
+    const valores = [
+      null,
+      'compra',
+      [],
+      sinNCF,
+      { ...compraDePrueba(), MontoBienes: 0 },
+      { ...compraDePrueba(), PropinaLegal: 10 },
+      { ...compraDePrueba(), Proveedor: 'Ferretería Inventada' },
+    ];
+    for (const valor of valores) expect(esCompra(valor)).toBe(false);
   });
 });

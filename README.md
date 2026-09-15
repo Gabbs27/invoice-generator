@@ -48,6 +48,15 @@ The environment picks the mode:
 - A received e-CF 31, 33 or 34 fills the form. The XML has to validate against
   DGII's XSD and be addressed to your RNC. What it doesn't say (the type of goods
   and services, and sometimes the payment method) you complete.
+- Locally, the purchases workbook (.xlsx) fills a month in one go. Pick the
+  month's sheet, review each row and save the ones you check.
+  - The amount is Monto total less ITBS and 10% ley. The tip goes in its own
+    field, as NG 07-2018 asks.
+  - Type, goods or services and payment method come from the supplier's last
+    purchase. Without one, it's 09, services, and a method you pick.
+  - An RNC or cédula that lost its leading zeros in Excel, or whose check digit
+    doesn't match, waits for you to confirm it.
+  - It isn't in the demo, where anything saved is visible to everyone.
 - A month's 606 holds that month's invoices. It also holds earlier invoices paid
   that month with a retention, sent again with their original date, as DGII's
   instructions ask. If any purchase in the month has an error, the app writes no
